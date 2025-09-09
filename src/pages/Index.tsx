@@ -4,6 +4,9 @@ import { Header } from "@/components/layout/Header";
 import { StudentDashboard } from "@/components/dashboard/StudentDashboard";
 import { TeacherDashboard } from "@/components/dashboard/TeacherDashboard";
 import { ExamInterface } from "@/components/exam/ExamInterface";
+import { ResultsView } from "@/components/results/ResultsView";
+import { ExamCreator } from "@/components/exam/ExamCreator";
+import { ExamView } from "@/components/exam/ExamView";
 import { useToast } from "@/hooks/use-toast";
 
 interface User {
@@ -14,8 +17,9 @@ interface User {
 
 const Index = () => {
   const [user, setUser] = useState<User | null>(null);
-  const [currentView, setCurrentView] = useState<"dashboard" | "exam" | "results">("dashboard");
+  const [currentView, setCurrentView] = useState<"dashboard" | "exam" | "results" | "create-exam" | "view-exam">("dashboard");
   const [currentExamId, setCurrentExamId] = useState<string | null>(null);
+  const [examResults, setExamResults] = useState<any>(null);
   const { toast } = useToast();
 
   const handleLogin = (role: string, email: string, name?: string) => {
@@ -49,13 +53,14 @@ const Index = () => {
     });
   };
 
-  const handleSubmitExam = (answers: Record<string, string>) => {
-    console.log("Exam submitted with answers:", answers);
-    setCurrentView("dashboard");
+  const handleSubmitExam = (results: any) => {
+    console.log("Exam submitted with results:", results);
+    setExamResults(results);
+    setCurrentView("results");
     setCurrentExamId(null);
     toast({
       title: "Exam Submitted",
-      description: "Your answers have been submitted successfully!",
+      description: `Your exam has been submitted! Score: ${results.totalScore}/${results.maxScore} (${results.percentage}%)`,
     });
   };
 
@@ -73,10 +78,21 @@ const Index = () => {
   };
 
   const handleCreateExam = () => {
+    setCurrentView("create-exam");
     toast({
       title: "Create Exam",
       description: "Opening exam creation interface...",
     });
+  };
+
+  const handleViewExam = (examId: string) => {
+    setCurrentExamId(examId);
+    setCurrentView("view-exam");
+  };
+
+  const handleBackToDashboard = () => {
+    setCurrentView("dashboard");
+    setCurrentExamId(null);
   };
 
   if (!user) {
@@ -90,6 +106,38 @@ const Index = () => {
         onSubmitExam={handleSubmitExam}
         onExitExam={handleExitExam}
       />
+    );
+  }
+
+  if (currentView === "results") {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header user={user} onLogout={handleLogout} />
+        <ResultsView user={user} onBack={handleBackToDashboard} />
+      </div>
+    );
+  }
+
+  if (currentView === "create-exam") {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header user={user} onLogout={handleLogout} />
+        <ExamCreator onBack={handleBackToDashboard} />
+      </div>
+    );
+  }
+
+  if (currentView === "view-exam" && currentExamId) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header user={user} onLogout={handleLogout} />
+        <ExamView 
+          examId={currentExamId}
+          onBack={handleBackToDashboard}
+          onEdit={() => setCurrentView("create-exam")}
+          onViewResults={handleViewResults}
+        />
+      </div>
     );
   }
 

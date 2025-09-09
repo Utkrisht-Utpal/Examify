@@ -19,7 +19,14 @@ interface Question {
 
 interface ExamInterfaceProps {
   examId: string;
-  onSubmitExam: (answers: Record<string, string>) => void;
+  onSubmitExam: (results: {
+    totalScore: number;
+    maxScore: number;
+    correctAnswers: number;
+    incorrectAnswers: number;
+    percentage: number;
+    answers: Record<string, string>;
+  }) => void;
   onExitExam: () => void;
 }
 
@@ -95,9 +102,45 @@ export const ExamInterface = ({ examId, onSubmitExam, onExitExam }: ExamInterfac
     }));
   };
 
+  const calculateResults = () => {
+    let totalScore = 0;
+    let correctAnswers = 0;
+    const maxScore = exam.questions.length * 20; // Assuming 20 points per question
+
+    exam.questions.forEach((question) => {
+      const userAnswer = answers[question.id];
+      if (!userAnswer) return;
+
+      if (question.type === "mcq") {
+        if (userAnswer === question.options?.[0]) { // First option is correct for demo
+          totalScore += 20;
+          correctAnswers++;
+        }
+      } else {
+        // For descriptive, give partial marks based on answer length
+        if (userAnswer.length > 50) {
+          totalScore += 15; // Partial marks
+          correctAnswers++;
+        } else if (userAnswer.length > 20) {
+          totalScore += 10;
+        }
+      }
+    });
+
+    return {
+      totalScore,
+      maxScore,
+      correctAnswers,
+      incorrectAnswers: exam.questions.length - correctAnswers,
+      percentage: Math.round((totalScore / maxScore) * 100),
+      answers
+    };
+  };
+
   const handleSubmit = () => {
     setIsSubmitting(true);
-    onSubmitExam(answers);
+    const results = calculateResults();
+    onSubmitExam(results);
   };
 
   const getTimeColor = () => {
