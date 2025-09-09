@@ -1,0 +1,66 @@
+import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { BookOpen, LogOut, Bell } from "lucide-react";
+
+interface HeaderProps {
+  user: {
+    name: string;
+    email: string;
+    role: string;
+  };
+  onLogout: () => void;
+}
+
+export const Header = ({ user, onLogout }: HeaderProps) => {
+  const getRoleBadge = (role: string) => {
+    const variants = {
+      student: "bg-success text-success-foreground",
+      teacher: "bg-primary text-primary-foreground",
+      admin: "bg-accent text-accent-foreground",
+    };
+    return variants[role as keyof typeof variants] || "bg-muted text-muted-foreground";
+  };
+
+  return (
+    <header className="border-b bg-card">
+      <div className="flex h-16 items-center justify-between px-6">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+              <BookOpen className="h-4 w-4" />
+            </div>
+            <span className="text-lg font-semibold">ExamPortal</span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-4">
+          <Button variant="outline" size="sm">
+            <Bell className="h-4 w-4" />
+          </Button>
+          
+          <div className="flex items-center gap-3">
+            <div className="text-right">
+              <p className="text-sm font-medium">{user.name}</p>
+              <div className="flex items-center gap-1">
+                <Badge variant="secondary" className={getRoleBadge(user.role)}>
+                  {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
+                </Badge>
+              </div>
+            </div>
+            <Avatar>
+              <AvatarFallback className="bg-primary text-primary-foreground">
+                {user.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+          </div>
+
+          <Button variant="outline" size="sm" onClick={onLogout}>
+            <LogOut className="h-4 w-4" />
+            Logout
+          </Button>
+        </div>
+      </div>
+    </header>
+  );
+};
