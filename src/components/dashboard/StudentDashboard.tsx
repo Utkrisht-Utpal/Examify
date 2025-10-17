@@ -1,3 +1,4 @@
+import React from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -5,7 +6,7 @@ import { Progress } from "@/components/ui/progress";
 import { Calendar, Clock, BookOpen, Trophy, TrendingUp, FileText } from "lucide-react";
 import { useExams } from "@/hooks/useExams";
 import { useResults } from "@/hooks/useResults";
-import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 
 interface StudentDashboardProps {
   user: {
@@ -18,9 +19,15 @@ interface StudentDashboardProps {
 }
 
 export const StudentDashboard = ({ user, onStartExam, onViewResults }: StudentDashboardProps) => {
-  const { user: authUser } = useAuth();
   const { exams, isLoading: examsLoading } = useExams();
-  const { results, isLoading: resultsLoading } = useResults(authUser?.id);
+  
+  // Get current user ID from Supabase
+  const [userId, setUserId] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id || null));
+  }, []);
+  
+  const { results, isLoading: resultsLoading } = useResults(userId || undefined);
 
   const availableExams = exams?.filter(exam => exam.status === 'published') || [];
   const recentResults = results?.slice(0, 3) || [];

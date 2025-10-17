@@ -1,3 +1,4 @@
+import React from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -5,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PlusCircle, BookOpen, Users, BarChart3, FileText, Calendar, Eye } from "lucide-react";
 import { useExams } from "@/hooks/useExams";
 import { useSubmissions } from "@/hooks/useSubmissions";
-import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 
 interface TeacherDashboardProps {
   user: {
@@ -18,11 +19,16 @@ interface TeacherDashboardProps {
 }
 
 export const TeacherDashboard = ({ user, onCreateExam, onViewResults }: TeacherDashboardProps) => {
-  const { user: authUser } = useAuth();
   const { exams, isLoading: examsLoading } = useExams();
   const { submissions } = useSubmissions();
+  
+  // Get current user ID from Supabase
+  const [userId, setUserId] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id || null));
+  }, []);
 
-  const teacherExams = exams?.filter(exam => exam.created_by === authUser?.id) || [];
+  const teacherExams = exams?.filter(exam => exam.created_by === userId) || [];
   const recentActivity = submissions?.slice(0, 4).map(sub => ({
     type: "submission",
     student: sub.profiles?.full_name || 'Unknown',
