@@ -52,7 +52,35 @@ export const useExams = () => {
     }
   });
 
-  return { exams, isLoading, createExam };
+  const updateExamStatus = useMutation({
+    mutationFn: async ({ examId, status }: { examId: string; status: 'draft' | 'published' | 'archived' }) => {
+      const { data, error } = await supabase
+        .from('exams')
+        .update({ status })
+        .eq('id', examId)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['exams'] });
+      toast({
+        title: 'Success',
+        description: `Exam ${data.status === 'published' ? 'published' : 'updated'} successfully`
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive'
+      });
+    }
+  });
+
+  return { exams, isLoading, createExam, updateExamStatus };
 };
 
 export const useExamWithQuestions = (examId: string) => {

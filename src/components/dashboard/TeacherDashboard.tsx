@@ -19,7 +19,7 @@ interface TeacherDashboardProps {
 }
 
 export const TeacherDashboard = ({ user, onCreateExam, onViewResults }: TeacherDashboardProps) => {
-  const { exams, isLoading: examsLoading } = useExams();
+  const { exams, isLoading: examsLoading, updateExamStatus } = useExams();
   const { submissions } = useSubmissions();
   
   // Get current user ID from Supabase
@@ -35,6 +35,10 @@ export const TeacherDashboard = ({ user, onCreateExam, onViewResults }: TeacherD
     exam: sub.exams?.title || 'Unknown',
     time: new Date(sub.submitted_at).toLocaleString()
   })) || [];
+
+  const handlePublishExam = (examId: string) => {
+    updateExamStatus.mutate({ examId, status: 'published' });
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -186,8 +190,12 @@ export const TeacherDashboard = ({ user, onCreateExam, onViewResults }: TeacherD
                           Results
                         </Button>
                         {exam.status === "draft" && (
-                          <Button size="sm">
-                            Publish
+                          <Button 
+                            size="sm"
+                            onClick={() => handlePublishExam(exam.id)}
+                            disabled={updateExamStatus.isPending}
+                          >
+                            {updateExamStatus.isPending ? 'Publishing...' : 'Publish'}
                           </Button>
                         )}
                       </div>
