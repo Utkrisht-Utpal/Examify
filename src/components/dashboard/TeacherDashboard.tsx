@@ -1,9 +1,11 @@
-import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PlusCircle, BookOpen, Users, BarChart3, FileText, Calendar, Eye } from "lucide-react";
+import { useExams } from "@/hooks/useExams";
+import { useSubmissions } from "@/hooks/useSubmissions";
+import { useAuth } from "@/hooks/useAuth";
 
 interface TeacherDashboardProps {
   user: {
@@ -16,51 +18,17 @@ interface TeacherDashboardProps {
 }
 
 export const TeacherDashboard = ({ user, onCreateExam, onViewResults }: TeacherDashboardProps) => {
-  const [exams] = useState([
-    {
-      id: "1",
-      title: "Mathematics Final Exam",
-      subject: "Mathematics",
-      duration: 120,
-      questions: 50,
-      studentsEnrolled: 45,
-      studentsCompleted: 23,
-      averageScore: 85,
-      status: "active",
-      createdDate: "2024-01-15"
-    },
-    {
-      id: "2",
-      title: "Physics Mid-term",
-      subject: "Physics", 
-      duration: 90,
-      questions: 40,
-      studentsEnrolled: 38,
-      studentsCompleted: 38,
-      averageScore: 78,
-      status: "completed",
-      createdDate: "2024-01-10"
-    },
-    {
-      id: "3",
-      title: "Chemistry Quiz",
-      subject: "Chemistry",
-      duration: 30,
-      questions: 20,
-      studentsEnrolled: 42,
-      studentsCompleted: 0,
-      averageScore: 0,
-      status: "draft",
-      createdDate: "2024-01-18"
-    }
-  ]);
+  const { user: authUser } = useAuth();
+  const { exams, isLoading: examsLoading } = useExams();
+  const { submissions } = useSubmissions();
 
-  const [recentActivity] = useState([
-    { type: "submission", student: "John Smith", exam: "Mathematics Final", time: "2 hours ago" },
-    { type: "submission", student: "Emma Wilson", exam: "Mathematics Final", time: "3 hours ago" },
-    { type: "exam_created", student: "", exam: "Chemistry Quiz", time: "1 day ago" },
-    { type: "submission", student: "Michael Brown", exam: "Physics Mid-term", time: "2 days ago" }
-  ]);
+  const teacherExams = exams?.filter(exam => exam.created_by === authUser?.id) || [];
+  const recentActivity = submissions?.slice(0, 4).map(sub => ({
+    type: "submission",
+    student: sub.profiles?.full_name || 'Unknown',
+    exam: sub.exams?.title || 'Unknown',
+    time: new Date(sub.submitted_at).toLocaleString()
+  })) || [];
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -113,9 +81,9 @@ export const TeacherDashboard = ({ user, onCreateExam, onViewResults }: TeacherD
             <BookOpen className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{exams.length}</div>
+            <div className="text-2xl font-bold">{teacherExams.length}</div>
             <p className="text-xs text-muted-foreground">
-              {exams.filter(e => e.status === "active").length} active
+              {teacherExams.filter(e => e.status === "published").length} active
             </p>
           </CardContent>
         </Card>
@@ -152,9 +120,9 @@ export const TeacherDashboard = ({ user, onCreateExam, onViewResults }: TeacherD
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-success">61</div>
+            <div className="text-2xl font-bold text-success">{submissions?.length || 0}</div>
             <p className="text-xs text-muted-foreground">
-              This week
+              Total submissions
             </p>
           </CardContent>
         </Card>
@@ -173,52 +141,54 @@ export const TeacherDashboard = ({ user, onCreateExam, onViewResults }: TeacherD
               <CardDescription>Create, edit, and monitor your exams</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {exams.map((exam) => (
-                  <div key={exam.id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="space-y-2">
+              {examsLoading ? (
+                <p className="text-center text-muted-foreground py-4">Loading exams...</p>
+              ) : teacherExams.length === 0 ? (
+                <p className="text-center text-muted-foreground py-4">No exams created yet</p>
+              ) : (
+                <div className="space-y-4">
+                  {teacherExams.map((exam) => (
+                    <div key={exam.id} className="flex items-center justify-between p-4 border rounded-lg">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-semibold">{exam.title}</h3>
+                          <Badge className={getStatusColor(exam.status)}>
+                            {exam.status}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                          <div className="flex items-center gap-1">
+                            <BookOpen className="h-3 w-3" />
+                            {exam.subject}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <BarChart3 className="h-3 w-3" />
+                            {exam.total_marks} marks
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Calendar className="h-3 w-3" />
+                            {new Date(exam.created_at).toLocaleDateString()}
+                          </div>
+                        </div>
+                      </div>
                       <div className="flex items-center gap-2">
-                        <h3 className="font-semibold">{exam.title}</h3>
-                        <Badge className={getStatusColor(exam.status)}>
-                          {exam.status}
-                        </Badge>
-                      </div>
-                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                        <div className="flex items-center gap-1">
-                          <BookOpen className="h-3 w-3" />
-                          {exam.subject}
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Users className="h-3 w-3" />
-                          {exam.studentsCompleted}/{exam.studentsEnrolled} completed
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <BarChart3 className="h-3 w-3" />
-                          Avg: {exam.averageScore}%
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Calendar className="h-3 w-3" />
-                          {exam.createdDate}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button variant="outline" size="sm">
-                        <Eye className="h-4 w-4 mr-1" />
-                        View
-                      </Button>
-                      <Button variant="outline" size="sm" onClick={onViewResults}>
-                        Results
-                      </Button>
-                      {exam.status === "draft" && (
-                        <Button size="sm">
-                          Publish
+                        <Button variant="outline" size="sm">
+                          <Eye className="h-4 w-4 mr-1" />
+                          View
                         </Button>
-                      )}
+                        <Button variant="outline" size="sm" onClick={onViewResults}>
+                          Results
+                        </Button>
+                        {exam.status === "draft" && (
+                          <Button size="sm">
+                            Publish
+                          </Button>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
