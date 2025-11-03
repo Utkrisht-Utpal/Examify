@@ -3,13 +3,11 @@ import { useAuth } from "@/hooks/useAuth";
 import { LoginForm } from "@/components/auth/LoginForm";
 import { RegisterForm } from "@/components/auth/RegisterForm";
 import { BookOpen, GraduationCap, Shield, Users } from "lucide-react";
-import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
   const { signIn, signUp } = useAuth();
-  const navigate = useNavigate();
   const { toast } = useToast();
 
   const handleLogin = async (role: string, email: string) => {
@@ -19,7 +17,6 @@ const Auth = () => {
         title: "Login Successful",
         description: `Welcome back!`,
       });
-      navigate("/");
     } catch (error: any) {
       toast({
         title: "Login Failed",
@@ -36,7 +33,6 @@ const Auth = () => {
         title: "Registration Successful",
         description: `Welcome, ${name}!`,
       });
-      navigate("/");
     } catch (error: any) {
       toast({
         title: "Registration Failed",
