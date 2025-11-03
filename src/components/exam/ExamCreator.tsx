@@ -19,6 +19,9 @@ import {
   Settings
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useExams } from "@/hooks/useExams";
+import { useQuestions } from "@/hooks/useQuestions";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ExamCreatorProps {
   onBack: () => void;
@@ -46,6 +49,8 @@ interface ExamDetails {
 
 export const ExamCreator = ({ onBack }: ExamCreatorProps) => {
   const { toast } = useToast();
+  const { createExam, updateExamStatus } = useExams();
+  const { createQuestion } = useQuestions();
   
   const [examDetails, setExamDetails] = useState<ExamDetails>({
     title: "",
@@ -141,7 +146,7 @@ export const ExamCreator = ({ onBack }: ExamCreatorProps) => {
     }
   };
 
-  const saveExam = () => {
+  const saveExam = async (status: 'draft' | 'published' = 'draft') => {
     if (!examDetails.title || !examDetails.subject) {
       toast({
         title: "Error",
@@ -160,22 +165,74 @@ export const ExamCreator = ({ onBack }: ExamCreatorProps) => {
       return;
     }
 
-    // Here you would typically save to backend
-    console.log("Saving exam:", { examDetails, questions });
-    
-    toast({
-      title: "Exam Saved",
-      description: `"${examDetails.title}" has been saved as a draft`
-    });
+    try {
+      // Create the exam
+      const examData = {
+        title: examDetails.title,
+        subject: examDetails.subject,
+        description: examDetails.instructions,
+        duration: examDetails.duration,
+        total_marks: examDetails.totalPoints,
+        passing_marks: Math.floor((examDetails.passingScore / 100) * examDetails.totalPoints),
+        status: status
+      };
+
+      const result = await createExam.mutateAsync(examData);
+      
+      if (!result) {
+        throw new Error('Failed to create exam');
+      }
+
+      // Save each question and link to exam
+      for (let i = 0; i < questions.length; i++) {
+        const question = questions[i];
+        
+        // Create the question
+        const questionData = {
+          question_text: question.text,
+          question_type: question.type,
+          subject: examDetails.subject,
+          options: question.type === 'mcq' ? question.options : null,
+          correct_answer: question.correctAnswer || '',
+          points: question.points
+        };
+
+        const questionResult = await createQuestion.mutateAsync(questionData);
+        
+        if (!questionResult) {
+          throw new Error('Failed to create question');
+        }
+
+        // Link question to exam
+        await supabase
+          .from('exam_questions')
+          .insert({
+            exam_id: result.id,
+            question_id: questionResult.id,
+            order_number: i + 1
+          });
+      }
+      
+      toast({
+        title: status === 'published' ? "Exam Published" : "Exam Saved",
+        description: status === 'published' 
+          ? `"${examDetails.title}" is now available to students`
+          : `"${examDetails.title}" has been saved as a draft`
+      });
+
+      // Go back to dashboard after successful save
+      setTimeout(() => onBack(), 1500);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save exam",
+        variant: "destructive"
+      });
+    }
   };
 
   const publishExam = () => {
-    saveExam();
-    // Additional publish logic here
-    toast({
-      title: "Exam Published",
-      description: `"${examDetails.title}" is now available to students`
-    });
+    saveExam('published');
   };
 
   const previewExam = () => {
@@ -213,7 +270,7 @@ export const ExamCreator = ({ onBack }: ExamCreatorProps) => {
             <Eye className="h-4 w-4 mr-2" />
             Preview
           </Button>
-          <Button variant="outline" onClick={saveExam}>
+          <Button variant="outline" onClick={() => saveExam('draft')}>
             <Save className="h-4 w-4 mr-2" />
             Save Draft
           </Button>
