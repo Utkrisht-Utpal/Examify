@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useAuth } from "@/hooks/useAuth";
 import Auth from "./Auth";
 import { Header } from "@/components/layout/Header";
 import { StudentDashboard } from "@/components/dashboard/StudentDashboard";
@@ -16,26 +17,14 @@ interface User {
 }
 
 const Index = () => {
-  const [user, setUser] = useState<User | null>(null);
+  const { user: authUser, signOut, loading, roles } = useAuth();
   const [currentView, setCurrentView] = useState<"dashboard" | "exam" | "results" | "create-exam" | "view-exam">("dashboard");
   const [currentExamId, setCurrentExamId] = useState<string | null>(null);
   const [examResults, setExamResults] = useState<any>(null);
   const { toast } = useToast();
 
-  const handleLogin = (role: string, email: string, name?: string) => {
-    setUser({
-      name: name || email.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-      email,
-      role
-    });
-    toast({
-      title: "Login Successful",
-      description: `Welcome back, ${name || 'User'}!`,
-    });
-  };
-
-  const handleLogout = () => {
-    setUser(null);
+  const handleLogout = async () => {
+    await signOut();
     setCurrentView("dashboard");
     setCurrentExamId(null);
     toast({
@@ -95,9 +84,27 @@ const Index = () => {
     setCurrentExamId(null);
   };
 
-  if (!user) {
-    return <Auth onLogin={handleLogin} />;
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
   }
+
+  if (!authUser) {
+    return <Auth />;
+  }
+
+  // Get user profile data
+  const user: User = {
+    name: authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || 'User',
+    email: authUser.email || '',
+    role: roles[0] || 'student', // Get the first role
+  };
 
   if (currentView === "exam" && currentExamId) {
     return (

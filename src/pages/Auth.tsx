@@ -1,24 +1,49 @@
 import { useState } from "react";
+import { useAuth } from "@/hooks/useAuth";
 import { LoginForm } from "@/components/auth/LoginForm";
 import { RegisterForm } from "@/components/auth/RegisterForm";
 import { BookOpen, GraduationCap, Shield, Users } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { useToast } from "@/hooks/use-toast";
 
-interface AuthProps {
-  onLogin: (role: string, email: string, name?: string) => void;
-}
-
-const Auth = ({ onLogin }: AuthProps) => {
+const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
+  const { signIn, signUp } = useAuth();
+  const navigate = useNavigate();
+  const { toast } = useToast();
 
-  const handleLogin = (role: string, email: string) => {
-    // In a real app, this would make an API call
-    const mockName = email.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-    onLogin(role, email, mockName);
+  const handleLogin = async (role: string, email: string) => {
+    try {
+      await signIn(email, "password123"); // Using a default password for demo
+      toast({
+        title: "Login Successful",
+        description: `Welcome back!`,
+      });
+      navigate("/");
+    } catch (error: any) {
+      toast({
+        title: "Login Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleRegister = (role: string, email: string, name: string) => {
-    // In a real app, this would make an API call
-    onLogin(role, email, name);
+  const handleRegister = async (role: string, email: string, name: string) => {
+    try {
+      await signUp(email, "password123", name, role); // Using a default password for demo
+      toast({
+        title: "Registration Successful",
+        description: `Welcome, ${name}!`,
+      });
+      navigate("/");
+    } catch (error: any) {
+      toast({
+        title: "Registration Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
   };
 
   return (
