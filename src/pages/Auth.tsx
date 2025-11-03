@@ -1,13 +1,16 @@
 import { useState } from "react";
-import { useAuth } from "@/hooks/useAuth";
 import { LoginForm } from "@/components/auth/LoginForm";
 import { RegisterForm } from "@/components/auth/RegisterForm";
 import { BookOpen, GraduationCap, Shield, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
-const Auth = () => {
+interface AuthProps {
+  signIn: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string, fullName: string, role: string) => Promise<void>;
+}
+
+const Auth = ({ signIn, signUp }: AuthProps) => {
   const [isLogin, setIsLogin] = useState(true);
-  const { signIn, signUp } = useAuth();
   const { toast } = useToast();
 
   const handleLogin = async (role: string, email: string) => {

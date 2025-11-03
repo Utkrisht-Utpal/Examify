@@ -17,7 +17,7 @@ interface User {
 }
 
 const Index = () => {
-  const { user: authUser, signOut, loading, roles } = useAuth();
+  const { user: authUser, signOut, signIn, signUp, loading, roles } = useAuth();
   const [currentView, setCurrentView] = useState<"dashboard" | "exam" | "results" | "create-exam" | "view-exam">("dashboard");
   const [currentExamId, setCurrentExamId] = useState<string | null>(null);
   const [examResults, setExamResults] = useState<any>(null);
@@ -96,7 +96,7 @@ const Index = () => {
   }
 
   if (!authUser) {
-    return <Auth />;
+    return <Auth signIn={signIn} signUp={signUp} />;
   }
 
   // Get user profile data
