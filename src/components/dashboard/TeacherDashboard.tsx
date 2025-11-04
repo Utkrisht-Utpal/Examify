@@ -16,9 +16,10 @@ interface TeacherDashboardProps {
   };
   onCreateExam: () => void;
   onViewResults: () => void;
+  onViewExam: (examId: string) => void;
 }
 
-export const TeacherDashboard = ({ user, onCreateExam, onViewResults }: TeacherDashboardProps) => {
+export const TeacherDashboard = ({ user, onCreateExam, onViewResults, onViewExam }: TeacherDashboardProps) => {
   const { exams, isLoading: examsLoading, updateExamStatus } = useExams();
   const { submissions } = useSubmissions();
   
@@ -223,7 +224,7 @@ export const TeacherDashboard = ({ user, onCreateExam, onViewResults }: TeacherD
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Button variant="outline" size="sm">
+                        <Button variant="outline" size="sm" onClick={() => onViewExam(exam.id)}>
                           <Eye className="h-4 w-4 mr-1" />
                           View
                         </Button>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -20,6 +20,9 @@ import {
   CheckCircle,
   XCircle
 } from "lucide-react";
+import { useExamWithQuestions } from "@/hooks/useExams";
+import { useSubmissions } from "@/hooks/useSubmissions";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ExamViewProps {
   examId: string;
@@ -63,69 +66,49 @@ interface ExamData {
 }
 
 export const ExamView = ({ examId, onBack, onEdit, onViewResults }: ExamViewProps) => {
-  // Sample exam data
-  const [examData] = useState<ExamData>({
-    id: examId,
-    title: "Mathematics Final Exam",
-    subject: "Mathematics", 
-    duration: 120,
-    totalQuestions: 5,
-    totalPoints: 100,
-    passingScore: 60,
-    status: "active",
-    createdDate: "2024-01-15",
-    startDate: "2024-01-20 10:00",
-    endDate: "2024-01-20 12:00",
-    instructions: "Read all questions carefully before answering. You have 120 minutes to complete this exam. Make sure to manage your time effectively.",
-    studentsEnrolled: 45,
-    studentsCompleted: 23,
-    averageScore: 75.5,
-    questions: [
-      {
-        id: "1",
-        type: "mcq",
-        text: "What is the derivative of x² + 3x + 2?",
-        options: ["2x + 3", "x² + 3", "2x + 2", "3x + 2"],
-        correctAnswer: "2x + 3",
-        points: 20
-      },
-      {
-        id: "2",
-        type: "mcq", 
-        text: "If f(x) = sin(x), what is f'(x)?",
-        options: ["cos(x)", "-cos(x)", "sin(x)", "-sin(x)"],
-        correctAnswer: "cos(x)",
-        points: 20
-      },
-      {
-        id: "3",
-        type: "descriptive",
-        text: "Explain the fundamental theorem of calculus and provide an example of its application.",
-        points: 30
-      },
-      {
-        id: "4",
-        type: "mcq",
-        text: "What is the integral of 2x dx?",
-        options: ["x²", "x² + C", "2x²", "2x² + C"],
-        correctAnswer: "x² + C",
-        points: 15
-      },
-      {
-        id: "5",
-        type: "descriptive", 
-        text: "Solve the differential equation dy/dx = 2x and explain your solution method.",
-        points: 15
+  const { data: examData, isLoading } = useExamWithQuestions(examId);
+  const { submissions } = useSubmissions();
+  const [averageScore, setAverageScore] = React.useState(0);
+  const [submissionResults, setSubmissionResults] = React.useState<Record<string, any>>({});
+
+  if (isLoading || !examData) {
+    return (
+      <div className="p-6 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading exam...</p>
+        </div>
+      </div>
+    );
+  }
+
+  const examSubmissions = submissions?.filter(s => s.exam_id === examId) || [];
+  const studentsCompleted = examSubmissions.length;
+  const studentsEnrolled = studentsCompleted; // This should come from enrollment data
+  
+  // Fetch average score and submission results
+  React.useEffect(() => {
+    const fetchData = async () => {
+      // Fetch average score
+      const { data: results } = await supabase
+        .from('results')
+        .select('percentage, submission_id, score')
+        .eq('exam_id', examId);
+      
+      if (results && results.length > 0) {
+        const avg = results.reduce((acc, r) => acc + r.percentage, 0) / results.length;
+        setAverageScore(avg);
+        
+        // Create a map of submission_id to result
+        const resultsMap: Record<string, any> = {};
+        results.forEach(r => {
+          resultsMap[r.submission_id] = r;
+        });
+        setSubmissionResults(resultsMap);
       }
-    ],
-    submissions: [
-      { studentName: "Alice Johnson", score: 95, percentage: 95, submittedAt: "2024-01-20 11:20", timeSpent: "1h 20m", status: "completed" },
-      { studentName: "Bob Smith", score: 88, percentage: 88, submittedAt: "2024-01-20 11:45", timeSpent: "1h 45m", status: "completed" },
-      { studentName: "Carol Davis", score: 82, percentage: 82, submittedAt: "2024-01-20 11:30", timeSpent: "1h 30m", status: "completed" },
-      { studentName: "David Wilson", score: 0, percentage: 0, submittedAt: "", timeSpent: "45m", status: "in-progress" },
-      { studentName: "Emma Brown", score: 70, percentage: 70, submittedAt: "2024-01-20 11:40", timeSpent: "1h 40m", status: "completed" }
-    ]
-  });
+    };
+    fetchData();
+  }, [examId]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -147,7 +130,7 @@ export const ExamView = ({ examId, onBack, onEdit, onViewResults }: ExamViewProp
     }
   };
 
-  const completionRate = (examData.studentsCompleted / examData.studentsEnrolled) * 100;
+  const completionRate = studentsEnrolled > 0 ? (studentsCompleted / studentsEnrolled) * 100 : 0;
 
   return (
     <div className="p-6 space-y-6">
@@ -165,7 +148,7 @@ export const ExamView = ({ examId, onBack, onEdit, onViewResults }: ExamViewProp
                 {examData.status}
               </Badge>
             </div>
-            <p className="text-muted-foreground">{examData.subject} • Created on {examData.createdDate}</p>
+            <p className="text-muted-foreground">{examData.subject} • Created on {new Date(examData.created_at).toLocaleDateString()}</p>
           </div>
         </div>
         
@@ -193,10 +176,10 @@ export const ExamView = ({ examId, onBack, onEdit, onViewResults }: ExamViewProp
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{examData.studentsEnrolled}</div>
+            <div className="text-2xl font-bold">{studentsEnrolled}</div>
             <Progress value={completionRate} className="mt-2" />
             <p className="text-xs text-muted-foreground mt-1">
-              {examData.studentsCompleted} completed ({completionRate.toFixed(0)}%)
+              {studentsCompleted} completed ({completionRate.toFixed(0)}%)
             </p>
           </CardContent>
         </Card>
@@ -207,9 +190,9 @@ export const ExamView = ({ examId, onBack, onEdit, onViewResults }: ExamViewProp
             <BarChart3 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-primary">{examData.averageScore}%</div>
+            <div className="text-2xl font-bold text-primary">{averageScore.toFixed(1)}%</div>
             <p className="text-xs text-muted-foreground">
-              Passing score: {examData.passingScore}%
+              Passing score: {Math.round((examData.passing_marks / examData.total_marks) * 100)}%
             </p>
           </CardContent>
         </Card>
@@ -222,7 +205,7 @@ export const ExamView = ({ examId, onBack, onEdit, onViewResults }: ExamViewProp
           <CardContent>
             <div className="text-2xl font-bold">{examData.duration}min</div>
             <p className="text-xs text-muted-foreground">
-              {examData.totalQuestions} questions
+              {examData.questions?.length || 0} questions
             </p>
           </CardContent>
         </Card>
@@ -233,7 +216,7 @@ export const ExamView = ({ examId, onBack, onEdit, onViewResults }: ExamViewProp
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-success">{examData.totalPoints}</div>
+            <div className="text-2xl font-bold text-success">{examData.total_marks}</div>
             <p className="text-xs text-muted-foreground">
               Max possible score
             </p>
@@ -242,7 +225,7 @@ export const ExamView = ({ examId, onBack, onEdit, onViewResults }: ExamViewProp
       </div>
 
       {/* Exam Schedule */}
-      {examData.startDate && examData.endDate && (
+      {examData.scheduled_at && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -253,12 +236,8 @@ export const ExamView = ({ examId, onBack, onEdit, onViewResults }: ExamViewProp
           <CardContent>
             <div className="grid gap-4 md:grid-cols-2">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Start Time</p>
-                <p className="text-lg font-semibold">{examData.startDate}</p>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">End Time</p>
-                <p className="text-lg font-semibold">{examData.endDate}</p>
+                <p className="text-sm font-medium text-muted-foreground">Scheduled At</p>
+                <p className="text-lg font-semibold">{new Date(examData.scheduled_at).toLocaleString()}</p>
               </div>
             </div>
           </CardContent>
@@ -268,8 +247,8 @@ export const ExamView = ({ examId, onBack, onEdit, onViewResults }: ExamViewProp
       <Tabs defaultValue="details" className="space-y-4">
         <TabsList>
           <TabsTrigger value="details">Exam Details</TabsTrigger>
-          <TabsTrigger value="questions">Questions ({examData.questions.length})</TabsTrigger>
-          <TabsTrigger value="submissions">Submissions ({examData.studentsCompleted})</TabsTrigger>
+          <TabsTrigger value="questions">Questions ({examData.questions?.length || 0})</TabsTrigger>
+          <TabsTrigger value="submissions">Submissions ({studentsCompleted})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="details">
@@ -280,7 +259,7 @@ export const ExamView = ({ examId, onBack, onEdit, onViewResults }: ExamViewProp
             </CardHeader>
             <CardContent>
               <div className="bg-muted p-4 rounded-lg">
-                <p className="whitespace-pre-line">{examData.instructions}</p>
+                <p className="whitespace-pre-line">{examData.description || 'No instructions provided'}</p>
               </div>
             </CardContent>
           </Card>
@@ -294,34 +273,34 @@ export const ExamView = ({ examId, onBack, onEdit, onViewResults }: ExamViewProp
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {examData.questions.map((question, index) => (
+                {(examData.questions || []).map((question: any, index: number) => (
                   <div key={question.id} className="border rounded-lg p-4">
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex items-center gap-2">
                         <span className="font-medium">Question {index + 1}</span>
-                        <Badge variant="outline">{question.type.toUpperCase()}</Badge>
+                        <Badge variant="outline">{question.question_type?.toUpperCase()}</Badge>
                         <Badge variant="secondary">{question.points} points</Badge>
                       </div>
                     </div>
                     
                     <div className="space-y-3">
-                      <p className="font-medium">{question.text}</p>
+                      <p className="font-medium">{question.question_text}</p>
                       
-                      {question.type === "mcq" && question.options && (
+                      {question.question_type === "mcq" && question.options && (
                         <div className="space-y-2">
                           <p className="text-sm font-medium text-muted-foreground">Options:</p>
                           <div className="grid gap-2">
-                            {question.options.map((option, optIndex) => (
+                            {question.options.map((option: string, optIndex: number) => (
                               <div 
                                 key={optIndex} 
                                 className={`text-sm p-2 rounded border ${
-                                  option === question.correctAnswer 
+                                  option === question.correct_answer 
                                     ? 'bg-success/20 border-success text-success-foreground' 
                                     : 'bg-muted'
                                 }`}
                               >
                                 {String.fromCharCode(65 + optIndex)}. {option}
-                                {option === question.correctAnswer && (
+                                {option === question.correct_answer && (
                                   <CheckCircle className="inline h-4 w-4 ml-2" />
                                 )}
                               </div>
@@ -351,40 +330,38 @@ export const ExamView = ({ examId, onBack, onEdit, onViewResults }: ExamViewProp
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {examData.submissions.map((submission, index) => (
-                  <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <p className="font-medium">{submission.studentName}</p>
-                        <Badge variant={submission.status === "completed" ? "default" : "secondary"}>
-                          {submission.status === "completed" ? (
-                            <CheckCircle className="h-3 w-3 mr-1" />
-                          ) : (
-                            <Clock className="h-3 w-3 mr-1" />
-                          )}
-                          {submission.status}
-                        </Badge>
+                {examSubmissions.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-4">No submissions yet</p>
+                ) : (
+                  examSubmissions.map((submission: any, index: number) => {
+                    const result = submissionResults[submission.id];
+                    return (
+                      <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium">{submission.profiles?.full_name || 'Unknown Student'}</p>
+                            <Badge variant="default">
+                              <CheckCircle className="h-3 w-3 mr-1" />
+                              completed
+                            </Badge>
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            Submitted: {new Date(submission.submitted_at).toLocaleString()} • 
+                            Time: {submission.time_taken ? `${Math.floor(submission.time_taken / 60)}m` : 'N/A'}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-lg font-semibold">
+                            {result?.score || 0}/{examData.total_marks}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {result?.percentage || 0}%
+                          </p>
+                        </div>
                       </div>
-                      <div className="text-sm text-muted-foreground">
-                        {submission.status === "completed" ? (
-                          <>Submitted: {submission.submittedAt} • Time: {submission.timeSpent}</>
-                        ) : (
-                          <>In progress • Time spent: {submission.timeSpent}</>
-                        )}
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      {submission.status === "completed" ? (
-                        <p className="text-lg font-semibold">{submission.score}/{examData.totalPoints}</p>
-                      ) : (
-                        <p className="text-muted-foreground">-</p>
-                      )}
-                      <p className="text-sm text-muted-foreground">
-                        {submission.status === "completed" ? `${submission.percentage}%` : "Ongoing"}
-                      </p>
-                    </div>
-                  </div>
-                ))}
+                    );
+                  })
+                )}
               </div>
             </CardContent>
           </Card>

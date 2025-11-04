@@ -162,10 +162,11 @@ const Index = () => {
         )}
         
         {user.role === "teacher" && (
-          <TeacherDashboard
+          <TeacherDashboard 
             user={user}
             onCreateExam={handleCreateExam}
             onViewResults={handleViewResults}
+            onViewExam={handleViewExam}
           />
         )}
         

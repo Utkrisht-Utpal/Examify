@@ -8,6 +8,9 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Clock, CheckCircle, AlertTriangle, ChevronLeft, ChevronRight } from "lucide-react";
+import { useExamWithQuestions } from "@/hooks/useExams";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 interface Question {
   id: string;
@@ -31,47 +34,31 @@ interface ExamInterfaceProps {
 }
 
 export const ExamInterface = ({ examId, onSubmitExam, onExitExam }: ExamInterfaceProps) => {
+  const { toast } = useToast();
+  const { data: examData, isLoading } = useExamWithQuestions(examId);
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
-  const [timeLeft, setTimeLeft] = useState(5400); // 90 minutes in seconds
+  const [timeLeft, setTimeLeft] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [startTime] = useState(Date.now());
 
-  // Sample exam data
-  const exam = {
-    id: examId,
-    title: "Mathematics Final Exam",
-    duration: 90,
-    questions: [
-      {
-        id: "1",
-        type: "mcq" as const,
-        text: "What is the derivative of x² + 3x + 2?",
-        options: ["2x + 3", "x² + 3", "2x + 2", "3x + 2"]
-      },
-      {
-        id: "2", 
-        type: "mcq" as const,
-        text: "If f(x) = sin(x), what is f'(x)?",
-        options: ["cos(x)", "-cos(x)", "sin(x)", "-sin(x)"]
-      },
-      {
-        id: "3",
-        type: "descriptive" as const,
-        text: "Explain the fundamental theorem of calculus and provide an example of its application."
-      },
-      {
-        id: "4",
-        type: "mcq" as const,
-        text: "What is the integral of 2x dx?",
-        options: ["x²", "x² + C", "2x²", "2x² + C"]
-      },
-      {
-        id: "5",
-        type: "descriptive" as const,
-        text: "Solve the differential equation dy/dx = 2x and explain your solution method."
-      }
-    ]
-  };
+  // Initialize timer when exam data loads
+  useEffect(() => {
+    if (examData) {
+      setTimeLeft(examData.duration * 60); // Convert minutes to seconds
+    }
+  }, [examData]);
+
+  if (isLoading || !examData || !examData.questions) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading exam...</p>
+        </div>
+      </div>
+    );
+  }
 
   // Timer effect
   useEffect(() => {
@@ -105,24 +92,24 @@ export const ExamInterface = ({ examId, onSubmitExam, onExitExam }: ExamInterfac
   const calculateResults = () => {
     let totalScore = 0;
     let correctAnswers = 0;
-    const maxScore = exam.questions.length * 20; // Assuming 20 points per question
+    const maxScore = examData.total_marks;
 
-    exam.questions.forEach((question) => {
+    examData.questions.forEach((question: any) => {
       const userAnswer = answers[question.id];
       if (!userAnswer) return;
 
-      if (question.type === "mcq") {
-        if (userAnswer === question.options?.[0]) { // First option is correct for demo
-          totalScore += 20;
+      if (question.question_type === "mcq") {
+        if (userAnswer === question.correct_answer) {
+          totalScore += question.points;
           correctAnswers++;
         }
       } else {
         // For descriptive, give partial marks based on answer length
         if (userAnswer.length > 50) {
-          totalScore += 15; // Partial marks
+          totalScore += Math.floor(question.points * 0.75);
           correctAnswers++;
         } else if (userAnswer.length > 20) {
-          totalScore += 10;
+          totalScore += Math.floor(question.points * 0.5);
         }
       }
     });
@@ -131,16 +118,65 @@ export const ExamInterface = ({ examId, onSubmitExam, onExitExam }: ExamInterfac
       totalScore,
       maxScore,
       correctAnswers,
-      incorrectAnswers: exam.questions.length - correctAnswers,
+      incorrectAnswers: examData.questions.length - correctAnswers,
       percentage: Math.round((totalScore / maxScore) * 100),
       answers
     };
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     setIsSubmitting(true);
-    const results = calculateResults();
-    onSubmitExam(results);
+    const timeSpent = Math.floor((Date.now() - startTime) / 1000); // in seconds
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      // Save submission
+      const { data: submission, error: submissionError } = await supabase
+        .from('submissions')
+        .insert({
+          exam_id: examId,
+          student_id: user.id,
+          answers: answers,
+          time_taken: timeSpent
+        })
+        .select()
+        .single();
+
+      if (submissionError) throw submissionError;
+
+      // Calculate results
+      const results = calculateResults();
+      
+      // Save results
+      const { error: resultError } = await supabase
+        .from('results')
+        .insert({
+          submission_id: submission.id,
+          exam_id: examId,
+          student_id: user.id,
+          score: results.totalScore,
+          total_marks: results.maxScore,
+          percentage: results.percentage
+        });
+
+      if (resultError) throw resultError;
+
+      toast({
+        title: "Exam Submitted Successfully!",
+        description: `Score: ${results.totalScore}/${results.maxScore} (${results.percentage}%)`
+      });
+
+      onSubmitExam(results);
+    } catch (error: any) {
+      toast({
+        title: "Submission Error",
+        description: error.message || "Failed to submit exam",
+        variant: "destructive"
+      });
+      setIsSubmitting(false);
+    }
   };
 
   const getTimeColor = () => {
@@ -150,7 +186,7 @@ export const ExamInterface = ({ examId, onSubmitExam, onExitExam }: ExamInterfac
   };
 
   const getQuestionStatus = (index: number) => {
-    const questionId = exam.questions[index].id;
+    const questionId = examData.questions[index].id;
     if (answers[questionId]) return "answered";
     if (index === currentQuestion) return "current";
     return "unanswered";
@@ -168,7 +204,7 @@ export const ExamInterface = ({ examId, onSubmitExam, onExitExam }: ExamInterfac
   };
 
   const answeredCount = Object.keys(answers).length;
-  const progress = (answeredCount / exam.questions.length) * 100;
+  const progress = (answeredCount / examData.questions.length) * 100;
 
   return (
     <div className="min-h-screen bg-background">
@@ -176,9 +212,9 @@ export const ExamInterface = ({ examId, onSubmitExam, onExitExam }: ExamInterfac
       <div className="border-b bg-card">
         <div className="flex h-16 items-center justify-between px-6">
           <div>
-            <h1 className="text-lg font-semibold">{exam.title}</h1>
+            <h1 className="text-lg font-semibold">{examData.title}</h1>
             <p className="text-sm text-muted-foreground">
-              Question {currentQuestion + 1} of {exam.questions.length}
+              Question {currentQuestion + 1} of {examData.questions.length}
             </p>
           </div>
           
@@ -201,7 +237,7 @@ export const ExamInterface = ({ examId, onSubmitExam, onExitExam }: ExamInterfac
                 <AlertDialogHeader>
                   <AlertDialogTitle>Submit Examination</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Are you sure you want to submit your exam? You have answered {answeredCount} out of {exam.questions.length} questions.
+                    Are you sure you want to submit your exam? You have answered {answeredCount} out of {examData.questions.length} questions.
                     This action cannot be undone.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
@@ -223,14 +259,14 @@ export const ExamInterface = ({ examId, onSubmitExam, onExitExam }: ExamInterfac
               <h3 className="font-semibold mb-2">Progress</h3>
               <Progress value={progress} className="mb-2" />
               <p className="text-sm text-muted-foreground">
-                {answeredCount}/{exam.questions.length} completed
+                {answeredCount}/{examData.questions.length} completed
               </p>
             </div>
 
             <div>
               <h3 className="font-semibold mb-2">Questions</h3>
               <div className="grid grid-cols-5 gap-2">
-                {exam.questions.map((_, index) => {
+                {examData.questions.map((_: any, index: number) => {
                   const status = getQuestionStatus(index);
                   return (
                     <button
@@ -269,21 +305,24 @@ export const ExamInterface = ({ examId, onSubmitExam, onExitExam }: ExamInterfac
               <div className="flex items-center justify-between">
                 <CardTitle>Question {currentQuestion + 1}</CardTitle>
                 <Badge variant="outline">
-                  {exam.questions[currentQuestion].type.toUpperCase()}
+                  {examData.questions[currentQuestion].question_type.toUpperCase()}
                 </Badge>
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="text-lg">
-                {exam.questions[currentQuestion].text}
+                {examData.questions[currentQuestion].question_text}
               </div>
 
-              {exam.questions[currentQuestion].type === "mcq" && exam.questions[currentQuestion].options && (
+              {examData.questions[currentQuestion].question_type === "mcq" && examData.questions[currentQuestion].options && (
                 <RadioGroup
-                  value={answers[exam.questions[currentQuestion].id] || ""}
-                  onValueChange={(value) => handleAnswerChange(exam.questions[currentQuestion].id, value)}
+                  value={answers[examData.questions[currentQuestion].id] || ""}
+                  onValueChange={(value) => handleAnswerChange(examData.questions[currentQuestion].id, value)}
                 >
-                  {exam.questions[currentQuestion].options!.map((option, index) => (
+                  {(Array.isArray(examData.questions[currentQuestion].options) 
+                    ? examData.questions[currentQuestion].options 
+                    : []
+                  ).map((option: string, index: number) => (
                     <div key={index} className="flex items-center space-x-2">
                       <RadioGroupItem value={option} id={`option-${index}`} />
                       <Label htmlFor={`option-${index}`} className="flex-1 cursor-pointer">
@@ -294,12 +333,12 @@ export const ExamInterface = ({ examId, onSubmitExam, onExitExam }: ExamInterfac
                 </RadioGroup>
               )}
 
-              {exam.questions[currentQuestion].type === "descriptive" && (
+              {examData.questions[currentQuestion].question_type === "descriptive" && (
                 <Textarea
                   placeholder="Type your answer here..."
                   className="min-h-32"
-                  value={answers[exam.questions[currentQuestion].id] || ""}
-                  onChange={(e) => handleAnswerChange(exam.questions[currentQuestion].id, e.target.value)}
+                  value={answers[examData.questions[currentQuestion].id] || ""}
+                  onChange={(e) => handleAnswerChange(examData.questions[currentQuestion].id, e.target.value)}
                 />
               )}
 
@@ -314,8 +353,8 @@ export const ExamInterface = ({ examId, onSubmitExam, onExitExam }: ExamInterfac
                 </Button>
 
                 <Button
-                  onClick={() => setCurrentQuestion(Math.min(exam.questions.length - 1, currentQuestion + 1))}
-                  disabled={currentQuestion === exam.questions.length - 1}
+                  onClick={() => setCurrentQuestion(Math.min(examData.questions.length - 1, currentQuestion + 1))}
+                  disabled={currentQuestion === examData.questions.length - 1}
                 >
                   Next
                   <ChevronRight className="h-4 w-4 ml-2" />
