@@ -24,8 +24,26 @@ export const TeacherDashboard = ({ user, onCreateExam, onViewResults }: TeacherD
   
   // Get current user ID from Supabase
   const [userId, setUserId] = React.useState<string | null>(null);
+  const [studentCount, setStudentCount] = React.useState<number>(0);
+  
   React.useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id || null));
+  }, []);
+
+  // Fetch actual student count from user_roles table
+  React.useEffect(() => {
+    const fetchStudentCount = async () => {
+      const { count, error } = await supabase
+        .from('user_roles')
+        .select('*', { count: 'exact', head: true })
+        .eq('role', 'student');
+      
+      if (!error && count !== null) {
+        setStudentCount(count);
+      }
+    };
+
+    fetchStudentCount();
   }, []);
 
   const teacherExams = exams?.filter(exam => exam.created_by === userId) || [];
@@ -104,9 +122,9 @@ export const TeacherDashboard = ({ user, onCreateExam, onViewResults }: TeacherD
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">125</div>
+            <div className="text-2xl font-bold">{studentCount}</div>
             <p className="text-xs text-muted-foreground">
-              Across all subjects
+              Enrolled students
             </p>
           </CardContent>
         </Card>
