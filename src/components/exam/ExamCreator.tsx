@@ -166,6 +166,11 @@ export const ExamCreator = ({ onBack }: ExamCreatorProps) => {
     }
 
     try {
+      toast({
+        title: "Saving...",
+        description: "Creating exam and questions..."
+      });
+
       // Create the exam
       const examData = {
         title: examDetails.title,
@@ -200,32 +205,37 @@ export const ExamCreator = ({ onBack }: ExamCreatorProps) => {
         const questionResult = await createQuestion.mutateAsync(questionData);
         
         if (!questionResult) {
-          throw new Error('Failed to create question');
+          throw new Error(`Failed to create question ${i + 1}`);
         }
 
         // Link question to exam
-        await supabase
+        const { error: linkError } = await supabase
           .from('exam_questions')
           .insert({
             exam_id: result.id,
             question_id: questionResult.id,
             order_number: i + 1
           });
+
+        if (linkError) {
+          throw new Error(`Failed to link question ${i + 1}: ${linkError.message}`);
+        }
       }
       
       toast({
-        title: status === 'published' ? "Exam Published" : "Exam Saved",
+        title: status === 'published' ? "Exam Published Successfully!" : "Exam Saved Successfully!",
         description: status === 'published' 
-          ? `"${examDetails.title}" is now available to students`
+          ? `"${examDetails.title}" is now live and available to students`
           : `"${examDetails.title}" has been saved as a draft`
       });
 
       // Go back to dashboard after successful save
       setTimeout(() => onBack(), 1500);
     } catch (error: any) {
+      console.error('Exam creation error:', error);
       toast({
-        title: "Error",
-        description: error.message || "Failed to save exam",
+        title: "Error Creating Exam",
+        description: error.message || "Failed to save exam. Please try again.",
         variant: "destructive"
       });
     }

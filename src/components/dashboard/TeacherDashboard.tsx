@@ -30,7 +30,7 @@ export const TeacherDashboard = ({ user, onCreateExam, onViewResults }: TeacherD
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id || null));
   }, []);
 
-  // Fetch actual student count from user_roles table
+  // Fetch actual student count from user_roles table with real-time updates
   React.useEffect(() => {
     const fetchStudentCount = async () => {
       const { count, error } = await supabase
@@ -43,7 +43,30 @@ export const TeacherDashboard = ({ user, onCreateExam, onViewResults }: TeacherD
       }
     };
 
+    // Initial fetch
     fetchStudentCount();
+
+    // Subscribe to real-time changes
+    const channel = supabase
+      .channel('user_roles_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_roles',
+          filter: 'role=eq.student'
+        },
+        () => {
+          // Refetch count when changes occur
+          fetchStudentCount();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const teacherExams = exams?.filter(exam => exam.created_by === userId) || [];

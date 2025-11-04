@@ -43,17 +43,6 @@ export const useQuestions = (subject?: string) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['questions'] });
-      toast({
-        title: 'Success',
-        description: 'Question created successfully'
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: 'Error',
-        description: error.message,
-        variant: 'destructive'
-      });
     }
   });
 

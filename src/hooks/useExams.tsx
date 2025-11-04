@@ -38,17 +38,6 @@ export const useExams = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['exams'] });
-      toast({
-        title: 'Success',
-        description: 'Exam created successfully'
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: 'Error',
-        description: error.message,
-        variant: 'destructive'
-      });
     }
   });
 
