@@ -321,6 +321,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_user_role: {
+        Args: { user_id_param?: string }
+        Returns: Database["public"]["Enums"]["app_role"]
+      }
+      get_user_roles: {
+        Args: { user_id_param?: string }
+        Returns: Database["public"]["Enums"]["app_role"][]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -328,6 +336,9 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_admin: { Args: never; Returns: boolean }
+      is_student: { Args: never; Returns: boolean }
+      is_teacher: { Args: never; Returns: boolean }
     }
     Enums: {
       app_role: "student" | "teacher" | "admin"
