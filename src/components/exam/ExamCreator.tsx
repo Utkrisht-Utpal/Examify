@@ -197,7 +197,7 @@ export const ExamCreator = ({ onBack }: ExamCreatorProps) => {
           question_text: question.text,
           question_type: question.type,
           subject: examDetails.subject,
-          options: question.type === 'mcq' ? question.options : null,
+          options: question.type === 'mcq' && question.options ? question.options : null,
           correct_answer: question.correctAnswer || '',
           points: question.points
         };

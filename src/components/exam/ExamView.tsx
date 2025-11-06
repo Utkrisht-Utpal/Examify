@@ -23,6 +23,7 @@ import {
 import { useExamWithQuestions } from "@/hooks/useExams";
 import { useSubmissions } from "@/hooks/useSubmissions";
 import { supabase } from "@/integrations/supabase/client";
+import { LoadingState } from "./ExamStates";
 
 interface ExamViewProps {
   examId: string;
@@ -71,13 +72,15 @@ export const ExamView = ({ examId, onBack, onEdit, onViewResults }: ExamViewProp
   const [averageScore, setAverageScore] = React.useState(0);
   const [submissionResults, setSubmissionResults] = React.useState<Record<string, any>>({});
 
-  if (isLoading || !examData) {
+  if (isLoading) {
+    return <LoadingState />;
+  }
+
+  if (!examData) {
     return (
-      <div className="p-6 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading exam...</p>
-        </div>
+      <div className="p-6">
+        <Button onClick={onBack}>← Back</Button>
+        <p className="text-center text-muted-foreground py-8">Exam not found</p>
       </div>
     );
   }
@@ -273,7 +276,7 @@ export const ExamView = ({ examId, onBack, onEdit, onViewResults }: ExamViewProp
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {(examData.questions || []).map((question: any, index: number) => (
+                {(examData.questions || []).filter((q: any) => q !== null).map((question: any, index: number) => (
                   <div key={question.id} className="border rounded-lg p-4">
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex items-center gap-2">

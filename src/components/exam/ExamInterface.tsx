@@ -11,6 +11,7 @@ import { Clock, CheckCircle, AlertTriangle, ChevronLeft, ChevronRight } from "lu
 import { useExamWithQuestions } from "@/hooks/useExams";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { LoadingState, ErrorState } from "./ExamStates";
 
 interface Question {
   id: string;
@@ -49,15 +50,16 @@ export const ExamInterface = ({ examId, onSubmitExam, onExitExam }: ExamInterfac
     }
   }, [examData]);
 
-  if (isLoading || !examData || !examData.questions) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading exam...</p>
-        </div>
-      </div>
-    );
+  if (isLoading) {
+    return <LoadingState />;
+  }
+
+  if (!examData) {
+    return <ErrorState message="Exam not found" onBack={onExitExam} />;
+  }
+
+  if (!examData.questions || examData.questions.length === 0) {
+    return <ErrorState message="This exam has no questions" onBack={onExitExam} />;
   }
 
   // Timer effect
@@ -314,15 +316,14 @@ export const ExamInterface = ({ examId, onSubmitExam, onExitExam }: ExamInterfac
                 {examData.questions[currentQuestion].question_text}
               </div>
 
-              {examData.questions[currentQuestion].question_type === "mcq" && examData.questions[currentQuestion].options && (
+              {examData.questions[currentQuestion]?.question_type === "mcq" && 
+               examData.questions[currentQuestion]?.options && 
+               Array.isArray(examData.questions[currentQuestion].options) && (
                 <RadioGroup
                   value={answers[examData.questions[currentQuestion].id] || ""}
                   onValueChange={(value) => handleAnswerChange(examData.questions[currentQuestion].id, value)}
                 >
-                  {(Array.isArray(examData.questions[currentQuestion].options) 
-                    ? examData.questions[currentQuestion].options 
-                    : []
-                  ).map((option: string, index: number) => (
+                  {examData.questions[currentQuestion].options.map((option: string, index: number) => (
                     <div key={index} className="flex items-center space-x-2">
                       <RadioGroupItem value={option} id={`option-${index}`} />
                       <Label htmlFor={`option-${index}`} className="flex-1 cursor-pointer">

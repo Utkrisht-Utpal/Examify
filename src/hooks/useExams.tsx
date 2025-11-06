@@ -80,9 +80,10 @@ export const useExamWithQuestions = (examId: string) => {
         .from('exams')
         .select('*')
         .eq('id', examId)
-        .single();
+        .maybeSingle();
       
       if (examError) throw examError;
+      if (!exam) throw new Error('Exam not found');
 
       const { data: examQuestions, error: questionsError } = await supabase
         .from('exam_questions')
@@ -92,11 +93,17 @@ export const useExamWithQuestions = (examId: string) => {
       
       if (questionsError) throw questionsError;
 
+      // Filter out any null questions and map to the questions object
+      const validQuestions = (examQuestions || [])
+        .filter(eq => eq.questions !== null)
+        .map(eq => eq.questions);
+
       return {
         ...exam,
-        questions: examQuestions.map(eq => eq.questions)
+        questions: validQuestions
       };
     },
-    enabled: !!examId
+    enabled: !!examId,
+    retry: 1
   });
 };
