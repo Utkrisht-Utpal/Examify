@@ -198,7 +198,7 @@ export const TeacherDashboard = ({ user, onCreateExam, onViewResults, onViewExam
               ) : teacherExams.length === 0 ? (
                 <p className="text-center text-muted-foreground py-4">No exams created yet</p>
               ) : (
-                <div className="space-y-4">
+                  <div className="space-y-4">
                   {teacherExams.map((exam) => (
                     <div key={exam.id} className="flex items-center justify-between p-4 border rounded-lg">
                       <div className="space-y-2">
@@ -207,6 +207,9 @@ export const TeacherDashboard = ({ user, onCreateExam, onViewResults, onViewExam
                           <Badge className={getStatusColor(exam.status)}>
                             {exam.status}
                           </Badge>
+                          {!exam.is_timed && (
+                            <Badge variant="outline">Untimed</Badge>
+                          )}
                         </div>
                         <div className="flex items-center gap-4 text-sm text-muted-foreground">
                           <div className="flex items-center gap-1">
@@ -219,9 +222,19 @@ export const TeacherDashboard = ({ user, onCreateExam, onViewResults, onViewExam
                           </div>
                           <div className="flex items-center gap-1">
                             <Calendar className="h-3 w-3" />
-                            {new Date(exam.created_at).toLocaleDateString()}
+                            Created {new Date(exam.created_at).toLocaleDateString()}
                           </div>
                         </div>
+                        {(exam.start_time || exam.end_time) && (
+                          <div className="text-xs text-muted-foreground space-y-1">
+                            {exam.start_time && (
+                              <p>📅 Starts: {new Date(exam.start_time).toLocaleString()}</p>
+                            )}
+                            {exam.end_time && (
+                              <p>⏰ {exam.auto_close ? 'Closes' : 'Ends'}: {new Date(exam.end_time).toLocaleString()}</p>
+                            )}
+                          </div>
+                        )}
                       </div>
                       <div className="flex items-center gap-2">
                         <Button variant="outline" size="sm" onClick={() => onViewExam(exam.id)}>

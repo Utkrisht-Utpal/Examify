@@ -228,7 +228,7 @@ export const ExamView = ({ examId, onBack, onEdit, onViewResults }: ExamViewProp
       </div>
 
       {/* Exam Schedule */}
-      {examData.scheduled_at && (
+      {(examData.start_time || examData.end_time) && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -237,11 +237,42 @@ export const ExamView = ({ examId, onBack, onEdit, onViewResults }: ExamViewProp
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Scheduled At</p>
-                <p className="text-lg font-semibold">{new Date(examData.scheduled_at).toLocaleString()}</p>
-              </div>
+            <div className="grid gap-4 md:grid-cols-3">
+              {examData.start_time && (
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Start Time</p>
+                  <p className="text-lg font-semibold">{new Date(examData.start_time).toLocaleString()}</p>
+                </div>
+              )}
+              {examData.end_time && (
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">End Time</p>
+                  <p className="text-lg font-semibold">{new Date(examData.end_time).toLocaleString()}</p>
+                </div>
+              )}
+              {examData.end_time && (
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Auto-close</p>
+                  <p className="text-lg font-semibold">
+                    <Badge variant={examData.auto_close ? "default" : "secondary"}>
+                      {examData.auto_close ? "Enabled" : "Disabled"}
+                    </Badge>
+                  </p>
+                </div>
+              )}
+            </div>
+            <div className="mt-4 pt-4 border-t">
+              <p className="text-sm font-medium text-muted-foreground">Exam Type</p>
+              <p className="text-base">
+                <Badge variant={examData.is_timed ? "default" : "outline"}>
+                  {examData.is_timed ? "Timed Exam" : "Untimed Exam"}
+                </Badge>
+                {examData.is_timed && (
+                  <span className="ml-2 text-muted-foreground">
+                    ({examData.duration} minutes per student)
+                  </span>
+                )}
+              </p>
             </div>
           </CardContent>
         </Card>

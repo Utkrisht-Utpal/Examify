@@ -7,6 +7,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Switch } from "@/components/ui/switch";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 import { 
   ArrowLeft, 
   Plus, 
@@ -16,7 +21,8 @@ import {
   Clock,
   BookOpen,
   FileText,
-  Settings
+  Settings,
+  CalendarIcon
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useExams } from "@/hooks/useExams";
@@ -45,6 +51,10 @@ interface ExamDetails {
   passingScore: number;
   randomizeQuestions: boolean;
   showResultsImmediately: boolean;
+  startTime?: Date;
+  endTime?: Date;
+  autoClose: boolean;
+  isTimed: boolean;
 }
 
 export const ExamCreator = ({ onBack }: ExamCreatorProps) => {
@@ -60,7 +70,11 @@ export const ExamCreator = ({ onBack }: ExamCreatorProps) => {
     totalPoints: 0,
     passingScore: 60,
     randomizeQuestions: false,
-    showResultsImmediately: false
+    showResultsImmediately: false,
+    startTime: undefined,
+    endTime: undefined,
+    autoClose: false,
+    isTimed: true
   });
 
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -179,7 +193,11 @@ export const ExamCreator = ({ onBack }: ExamCreatorProps) => {
         duration: examDetails.duration,
         total_marks: examDetails.totalPoints,
         passing_marks: Math.floor((examDetails.passingScore / 100) * examDetails.totalPoints),
-        status: status
+        status: status,
+        start_time: examDetails.startTime?.toISOString(),
+        end_time: examDetails.endTime?.toISOString(),
+        auto_close: examDetails.autoClose,
+        is_timed: examDetails.isTimed
       };
 
       const result = await createExam.mutateAsync(examData);
@@ -415,6 +433,167 @@ export const ExamCreator = ({ onBack }: ExamCreatorProps) => {
               </div>
             </CardContent>
           </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Exam Scheduling</CardTitle>
+              <CardDescription>Set when your exam should be available and when it should close</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Start Time (Optional)</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !examDetails.startTime && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {examDetails.startTime ? format(examDetails.startTime, "PPP p") : <span>Pick start date & time</span>}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={examDetails.startTime}
+                        onSelect={(date) => setExamDetails(prev => ({ ...prev, startTime: date }))}
+                        initialFocus
+                        className={cn("p-3 pointer-events-auto")}
+                      />
+                      <div className="p-3 border-t">
+                        <Label className="text-xs text-muted-foreground">Time (24h format)</Label>
+                        <div className="flex gap-2 mt-1">
+                          <Input
+                            type="number"
+                            min="0"
+                            max="23"
+                            placeholder="HH"
+                            className="w-16"
+                            value={examDetails.startTime ? examDetails.startTime.getHours() : ''}
+                            onChange={(e) => {
+                              const newDate = examDetails.startTime ? new Date(examDetails.startTime) : new Date();
+                              newDate.setHours(parseInt(e.target.value) || 0);
+                              setExamDetails(prev => ({ ...prev, startTime: newDate }));
+                            }}
+                          />
+                          <span className="self-center">:</span>
+                          <Input
+                            type="number"
+                            min="0"
+                            max="59"
+                            placeholder="MM"
+                            className="w-16"
+                            value={examDetails.startTime ? examDetails.startTime.getMinutes() : ''}
+                            onChange={(e) => {
+                              const newDate = examDetails.startTime ? new Date(examDetails.startTime) : new Date();
+                              newDate.setMinutes(parseInt(e.target.value) || 0);
+                              setExamDetails(prev => ({ ...prev, startTime: newDate }));
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                  <p className="text-xs text-muted-foreground">When students can start taking the exam. Leave empty for immediate availability.</p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>End Time (Optional)</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !examDetails.endTime && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {examDetails.endTime ? format(examDetails.endTime, "PPP p") : <span>Pick end date & time</span>}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={examDetails.endTime}
+                        onSelect={(date) => setExamDetails(prev => ({ ...prev, endTime: date }))}
+                        initialFocus
+                        className={cn("p-3 pointer-events-auto")}
+                      />
+                      <div className="p-3 border-t">
+                        <Label className="text-xs text-muted-foreground">Time (24h format)</Label>
+                        <div className="flex gap-2 mt-1">
+                          <Input
+                            type="number"
+                            min="0"
+                            max="23"
+                            placeholder="HH"
+                            className="w-16"
+                            value={examDetails.endTime ? examDetails.endTime.getHours() : ''}
+                            onChange={(e) => {
+                              const newDate = examDetails.endTime ? new Date(examDetails.endTime) : new Date();
+                              newDate.setHours(parseInt(e.target.value) || 0);
+                              setExamDetails(prev => ({ ...prev, endTime: newDate }));
+                            }}
+                          />
+                          <span className="self-center">:</span>
+                          <Input
+                            type="number"
+                            min="0"
+                            max="59"
+                            placeholder="MM"
+                            className="w-16"
+                            value={examDetails.endTime ? examDetails.endTime.getMinutes() : ''}
+                            onChange={(e) => {
+                              const newDate = examDetails.endTime ? new Date(examDetails.endTime) : new Date();
+                              newDate.setMinutes(parseInt(e.target.value) || 0);
+                              setExamDetails(prev => ({ ...prev, endTime: newDate }));
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                  <p className="text-xs text-muted-foreground">When the exam should stop accepting submissions. Leave empty to keep open indefinitely.</p>
+                </div>
+              </div>
+
+              <div className="space-y-4 pt-4 border-t">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="auto-close">Auto-close Exam</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Automatically close exam at end time and prevent new submissions
+                    </p>
+                  </div>
+                  <Switch
+                    id="auto-close"
+                    checked={examDetails.autoClose}
+                    onCheckedChange={(checked) => setExamDetails(prev => ({ ...prev, autoClose: checked }))}
+                    disabled={!examDetails.endTime}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="is-timed">Timed Exam</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Each student has a time limit (duration above) once they start. Uncheck for untimed exams.
+                    </p>
+                  </div>
+                  <Switch
+                    id="is-timed"
+                    checked={examDetails.isTimed}
+                    onCheckedChange={(checked) => setExamDetails(prev => ({ ...prev, isTimed: checked }))}
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="questions" className="space-y-6">
@@ -571,7 +750,7 @@ export const ExamCreator = ({ onBack }: ExamCreatorProps) => {
                   <div className="space-y-2 text-sm">
                     <p><span className="font-medium">Title:</span> {examDetails.title || "Not set"}</p>
                     <p><span className="font-medium">Subject:</span> {examDetails.subject || "Not set"}</p>
-                    <p><span className="font-medium">Duration:</span> {examDetails.duration} minutes</p>
+                    <p><span className="font-medium">Duration:</span> {examDetails.duration} minutes {!examDetails.isTimed && "(Untimed)"}</p>
                     <p><span className="font-medium">Total Points:</span> {examDetails.totalPoints}</p>
                     <p><span className="font-medium">Passing Score:</span> {examDetails.passingScore}%</p>
                   </div>
@@ -586,6 +765,24 @@ export const ExamCreator = ({ onBack }: ExamCreatorProps) => {
                   </div>
                 </div>
               </div>
+
+              {(examDetails.startTime || examDetails.endTime) && (
+                <div className="pt-4 border-t">
+                  <h3 className="font-semibold mb-3">Scheduling</h3>
+                  <div className="space-y-2 text-sm">
+                    {examDetails.startTime && (
+                      <p><span className="font-medium">Start Time:</span> {format(examDetails.startTime, "PPP 'at' p")}</p>
+                    )}
+                    {examDetails.endTime && (
+                      <p><span className="font-medium">End Time:</span> {format(examDetails.endTime, "PPP 'at' p")}</p>
+                    )}
+                    {examDetails.endTime && (
+                      <p><span className="font-medium">Auto-close:</span> {examDetails.autoClose ? "Enabled" : "Disabled"}</p>
+                    )}
+                    <p><span className="font-medium">Exam Type:</span> {examDetails.isTimed ? "Timed" : "Untimed"}</p>
+                  </div>
+                </div>
+              )}
 
               <div className="pt-4 border-t">
                 <h3 className="font-semibold mb-3">Instructions Preview</h3>

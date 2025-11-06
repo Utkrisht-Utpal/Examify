@@ -30,7 +30,29 @@ export const StudentDashboard = ({ user, onStartExam, onViewResults }: StudentDa
   const { results, isLoading: resultsLoading } = useResults(userId || undefined);
 
   const availableExams = exams?.filter(exam => exam.status === 'published') || [];
+  
+  // Helper function to get exam availability status
+  const getExamStatus = (exam: any) => {
+    const now = new Date();
+    const startTime = exam.start_time ? new Date(exam.start_time) : null;
+    const endTime = exam.end_time ? new Date(exam.end_time) : null;
+    
+    if (startTime && startTime > now) {
+      return { status: 'upcoming', label: 'Upcoming', canStart: false };
+    }
+    
+    if (endTime && exam.auto_close && endTime < now) {
+      return { status: 'ended', label: 'Ended', canStart: false };
+    }
+    
+    return { status: 'available', label: 'Available', canStart: true };
+  };
+  
   const recentResults = results?.slice(0, 3) || [];
+  
+  // Separate exams by status
+  const activeExams = availableExams.filter(exam => getExamStatus(exam).canStart);
+  const upcomingExams = availableExams.filter(exam => getExamStatus(exam).status === 'upcoming');
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -38,6 +60,8 @@ export const StudentDashboard = ({ user, onStartExam, onViewResults }: StudentDa
         return "bg-success text-success-foreground";
       case "upcoming":
         return "bg-warning text-warning-foreground";
+      case "ended":
+        return "bg-destructive text-destructive-foreground";
       case "completed":
         return "bg-muted text-muted-foreground";
       default:
@@ -69,7 +93,7 @@ export const StudentDashboard = ({ user, onStartExam, onViewResults }: StudentDa
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-success">
-              {availableExams.length}
+              {activeExams.length}
             </div>
           </CardContent>
         </Card>
@@ -107,7 +131,7 @@ export const StudentDashboard = ({ user, onStartExam, onViewResults }: StudentDa
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-warning">
-              {availableExams.filter(e => e.scheduled_at && new Date(e.scheduled_at) > new Date()).length}
+              {upcomingExams.length}
             </div>
           </CardContent>
         </Card>
@@ -126,42 +150,63 @@ export const StudentDashboard = ({ user, onStartExam, onViewResults }: StudentDa
             <p className="text-center text-muted-foreground py-4">No exams available</p>
           ) : (
             <div className="space-y-4">
-              {availableExams.map((exam) => (
-                <div key={exam.id} className="flex items-center justify-between p-4 border rounded-lg">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-semibold">{exam.title}</h3>
-                      <Badge className={getStatusColor(exam.status)}>
-                        {exam.status}
-                      </Badge>
+              {availableExams.map((exam) => {
+                const examStatus = getExamStatus(exam);
+                return (
+                  <div key={exam.id} className="flex items-center justify-between p-4 border rounded-lg">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-semibold">{exam.title}</h3>
+                        <Badge className={getStatusColor(examStatus.status)}>
+                          {examStatus.label}
+                        </Badge>
+                        {!exam.is_timed && (
+                          <Badge variant="outline">Untimed</Badge>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                        <div className="flex items-center gap-1">
+                          <BookOpen className="h-3 w-3" />
+                          {exam.subject}
+                        </div>
+                        {exam.is_timed && (
+                          <div className="flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {exam.duration} mins
+                          </div>
+                        )}
+                        <div className="flex items-center gap-1">
+                          <FileText className="h-3 w-3" />
+                          {exam.total_marks} marks
+                        </div>
+                      </div>
+                      {exam.start_time && examStatus.status === 'upcoming' && (
+                        <p className="text-xs text-muted-foreground">
+                          Available from: {new Date(exam.start_time).toLocaleString()}
+                        </p>
+                      )}
+                      {exam.end_time && examStatus.canStart && (
+                        <p className="text-xs text-muted-foreground">
+                          {exam.auto_close ? 'Closes at' : 'Ends at'}: {new Date(exam.end_time).toLocaleString()}
+                        </p>
+                      )}
+                      {examStatus.status === 'ended' && (
+                        <p className="text-xs text-destructive">
+                          This exam has ended
+                        </p>
+                      )}
                     </div>
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      <div className="flex items-center gap-1">
-                        <BookOpen className="h-3 w-3" />
-                        {exam.subject}
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        {exam.duration} mins
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <FileText className="h-3 w-3" />
-                        {exam.total_marks} marks
-                      </div>
+                    <div>
+                      <Button 
+                        onClick={() => onStartExam(exam.id)}
+                        disabled={!examStatus.canStart}
+                      >
+                        {examStatus.status === 'upcoming' ? 'Not Yet Available' : examStatus.status === 'ended' ? 'Exam Ended' : 'Start Exam'}
+                      </Button>
                     </div>
-                    {exam.scheduled_at && (
-                      <p className="text-xs text-muted-foreground">
-                        Scheduled: {new Date(exam.scheduled_at).toLocaleString()}
-                      </p>
-                    )}
                   </div>
-                  <div>
-                    <Button onClick={() => onStartExam(exam.id)}>
-                      Start Exam
-                    </Button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>

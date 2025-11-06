@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -45,7 +46,7 @@ export const ExamInterface = ({ examId, onSubmitExam, onExitExam }: ExamInterfac
 
   // Initialize timer when exam data loads
   useEffect(() => {
-    if (examData) {
+    if (examData && examData.is_timed) {
       setTimeLeft(examData.duration * 60); // Convert minutes to seconds
     }
   }, [examData]);
@@ -62,8 +63,30 @@ export const ExamInterface = ({ examId, onSubmitExam, onExitExam }: ExamInterfac
     return <ErrorState message="This exam has no questions" onBack={onExitExam} />;
   }
 
-  // Timer effect
+  // Check if exam is scheduled and not yet available
+  if (examData.start_time && new Date(examData.start_time) > new Date()) {
+    return (
+      <ErrorState 
+        message={`This exam will be available on ${format(new Date(examData.start_time), "PPP 'at' p")}`} 
+        onBack={onExitExam} 
+      />
+    );
+  }
+
+  // Check if exam has ended
+  if (examData.end_time && examData.auto_close && new Date(examData.end_time) < new Date()) {
+    return (
+      <ErrorState 
+        message="This exam has ended and is no longer accepting submissions" 
+        onBack={onExitExam} 
+      />
+    );
+  }
+
+  // Timer effect - only for timed exams
   useEffect(() => {
+    if (!examData?.is_timed) return;
+
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
@@ -75,7 +98,7 @@ export const ExamInterface = ({ examId, onSubmitExam, onExitExam }: ExamInterfac
     }, 1000);
 
     return () => clearInterval(timer);
-  }, []);
+  }, [examData?.is_timed]);
 
   const formatTime = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
@@ -223,10 +246,17 @@ export const ExamInterface = ({ examId, onSubmitExam, onExitExam }: ExamInterfac
           <div className="flex items-center gap-4">
             <div className="text-right">
               <p className="text-sm text-muted-foreground">Time Remaining</p>
-              <p className={`text-lg font-mono font-bold ${getTimeColor()}`}>
-                <Clock className="inline h-4 w-4 mr-1" />
-                {formatTime(timeLeft)}
-              </p>
+              {examData.is_timed ? (
+                <p className={`text-lg font-mono font-bold ${getTimeColor()}`}>
+                  <Clock className="inline h-4 w-4 mr-1" />
+                  {formatTime(timeLeft)}
+                </p>
+              ) : (
+                <p className="text-lg font-bold text-muted-foreground">
+                  <Clock className="inline h-4 w-4 mr-1" />
+                  Untimed
+                </p>
+              )}
             </div>
             
             <AlertDialog>

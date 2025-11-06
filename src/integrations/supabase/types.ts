@@ -52,13 +52,17 @@ export type Database = {
       }
       exams: {
         Row: {
+          auto_close: boolean | null
           created_at: string | null
           created_by: string
           description: string | null
           duration: number
+          end_time: string | null
           id: string
+          is_timed: boolean | null
           passing_marks: number
           scheduled_at: string | null
+          start_time: string | null
           status: Database["public"]["Enums"]["exam_status"]
           subject: string
           title: string
@@ -66,13 +70,17 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          auto_close?: boolean | null
           created_at?: string | null
           created_by: string
           description?: string | null
           duration: number
+          end_time?: string | null
           id?: string
+          is_timed?: boolean | null
           passing_marks?: number
           scheduled_at?: string | null
+          start_time?: string | null
           status?: Database["public"]["Enums"]["exam_status"]
           subject: string
           title: string
@@ -80,13 +88,17 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          auto_close?: boolean | null
           created_at?: string | null
           created_by?: string
           description?: string | null
           duration?: number
+          end_time?: string | null
           id?: string
+          is_timed?: boolean | null
           passing_marks?: number
           scheduled_at?: string | null
+          start_time?: string | null
           status?: Database["public"]["Enums"]["exam_status"]
           subject?: string
           title?: string
