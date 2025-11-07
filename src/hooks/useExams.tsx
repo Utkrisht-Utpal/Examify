@@ -110,9 +110,29 @@ export const useExamWithQuestions = (examId: string) => {
       
       if (questionsError) throw questionsError;
 
-      // Map questions back in the correct order
+      // Check if user is a student - if so, remove correct_answer field
+      const { data: { user } } = await supabase.auth.getUser();
+      const { data: userRoles } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user?.id || '');
+      
+      const isStudent = userRoles?.some(r => r.role === 'student');
+      
+      // Map questions back in the correct order and sanitize for students
       const orderedQuestions = examQuestions
-        .map(eq => questions?.find(q => q.id === eq.question_id))
+        .map(eq => {
+          const question = questions?.find(q => q.id === eq.question_id);
+          if (!question) return null;
+          
+          // Remove correct_answer for students to prevent cheating
+          if (isStudent) {
+            const { correct_answer, ...sanitizedQuestion } = question;
+            return sanitizedQuestion;
+          }
+          
+          return question;
+        })
         .filter(q => q !== null && q !== undefined);
 
       return {

@@ -13,9 +13,9 @@ const Auth = ({ signIn, signUp }: AuthProps) => {
   const [isLogin, setIsLogin] = useState(true);
   const { toast } = useToast();
 
-  const handleLogin = async (role: string, email: string) => {
+  const handleLogin = async (email: string, password: string) => {
     try {
-      await signIn(email, "password123"); // Using a default password for demo
+      await signIn(email, password);
       toast({
         title: "Login Successful",
         description: `Welcome back!`,
@@ -29,12 +29,22 @@ const Auth = ({ signIn, signUp }: AuthProps) => {
     }
   };
 
-  const handleRegister = async (role: string, email: string, name: string) => {
+  const handleRegister = async (email: string, password: string, name: string, role: string) => {
+    // Password validation
+    if (password.length < 6) {
+      toast({
+        title: "Password Too Short",
+        description: "Password must be at least 6 characters long.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
-      await signUp(email, "password123", name, role); // Using a default password for demo
+      await signUp(email, password, name, role);
       toast({
         title: "Registration Successful",
-        description: `Welcome, ${name}!`,
+        description: `Welcome, ${name}! You can now sign in.`,
       });
     } catch (error: any) {
       toast({

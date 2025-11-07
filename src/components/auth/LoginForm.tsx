@@ -7,32 +7,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { BookOpen, GraduationCap, Users, Shield } from "lucide-react";
 
 interface LoginFormProps {
-  onLogin: (role: string, email: string) => void;
+  onLogin: (email: string, password: string) => void;
   onSwitchToRegister: () => void;
 }
 
 export const LoginForm = ({ onLogin, onSwitchToRegister }: LoginFormProps) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<string>("");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (email && password && role) {
-      onLogin(role, email);
-    }
-  };
-
-  const getRoleIcon = (roleValue: string) => {
-    switch (roleValue) {
-      case "student":
-        return <GraduationCap className="h-4 w-4" />;
-      case "teacher":
-        return <BookOpen className="h-4 w-4" />;
-      case "admin":
-        return <Shield className="h-4 w-4" />;
-      default:
-        return <Users className="h-4 w-4" />;
+    if (email && password) {
+      onLogin(email, password);
     }
   };
 
@@ -68,40 +54,8 @@ export const LoginForm = ({ onLogin, onSwitchToRegister }: LoginFormProps) => {
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="role">Login As</Label>
-            <Select value={role} onValueChange={setRole} required>
-              <SelectTrigger>
-                <SelectValue placeholder="Select your role" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="student">
-                  <div className="flex items-center gap-2">
-                    <GraduationCap className="h-4 w-4" />
-                    Student
-                  </div>
-                </SelectItem>
-                <SelectItem value="teacher">
-                  <div className="flex items-center gap-2">
-                    <BookOpen className="h-4 w-4" />
-                    Teacher
-                  </div>
-                </SelectItem>
-                <SelectItem value="admin">
-                  <div className="flex items-center gap-2">
-                    <Shield className="h-4 w-4" />
-                    Administrator
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <Button type="submit" className="w-full" disabled={!email || !password || !role}>
-            <div className="flex items-center gap-2">
-              {role && getRoleIcon(role)}
-              Sign In
-            </div>
+          <Button type="submit" className="w-full" disabled={!email || !password}>
+            Sign In
           </Button>
 
           <div className="text-center">

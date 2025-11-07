@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { BookOpen, GraduationCap, Shield } from "lucide-react";
 
 interface RegisterFormProps {
-  onRegister: (role: string, email: string, name: string) => void;
+  onRegister: (email: string, password: string, name: string, role: string) => void;
   onSwitchToLogin: () => void;
 }
 
@@ -21,7 +21,9 @@ export const RegisterForm = ({ onRegister, onSwitchToLogin }: RegisterFormProps)
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (name && email && password && confirmPassword && role && password === confirmPassword) {
-      onRegister(role, email, name);
+      onRegister(email, password, name, role);
+    } else if (password !== confirmPassword) {
+      alert("Passwords do not match!");
     }
   };
 
@@ -62,10 +64,11 @@ export const RegisterForm = ({ onRegister, onSwitchToLogin }: RegisterFormProps)
             <Input
               id="password"
               type="password"
-              placeholder="Create a password"
+              placeholder="Create a password (min 6 characters)"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              minLength={6}
             />
           </div>
 
@@ -78,7 +81,11 @@ export const RegisterForm = ({ onRegister, onSwitchToLogin }: RegisterFormProps)
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               required
+              minLength={6}
             />
+            {password && confirmPassword && password !== confirmPassword && (
+              <p className="text-xs text-destructive">Passwords do not match</p>
+            )}
           </div>
 
           <div className="space-y-2">
