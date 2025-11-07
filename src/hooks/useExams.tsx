@@ -85,22 +85,39 @@ export const useExamWithQuestions = (examId: string) => {
       if (examError) throw examError;
       if (!exam) throw new Error('Exam not found');
 
-      const { data: examQuestions, error: questionsError } = await supabase
+      // Get exam_questions to get the order
+      const { data: examQuestions, error: eqError } = await supabase
         .from('exam_questions')
-        .select('*, questions(*)')
+        .select('question_id, order_number')
         .eq('exam_id', examId)
         .order('order_number');
       
+      if (eqError) throw eqError;
+
+      if (!examQuestions || examQuestions.length === 0) {
+        return {
+          ...exam,
+          questions: []
+        };
+      }
+
+      // Get questions separately with proper RLS
+      const questionIds = examQuestions.map(eq => eq.question_id);
+      const { data: questions, error: questionsError } = await supabase
+        .from('questions')
+        .select('*')
+        .in('id', questionIds);
+      
       if (questionsError) throw questionsError;
 
-      // Filter out any null questions and map to the questions object
-      const validQuestions = (examQuestions || [])
-        .filter(eq => eq.questions !== null)
-        .map(eq => eq.questions);
+      // Map questions back in the correct order
+      const orderedQuestions = examQuestions
+        .map(eq => questions?.find(q => q.id === eq.question_id))
+        .filter(q => q !== null && q !== undefined);
 
       return {
         ...exam,
-        questions: validQuestions
+        questions: orderedQuestions
       };
     },
     enabled: !!examId,
