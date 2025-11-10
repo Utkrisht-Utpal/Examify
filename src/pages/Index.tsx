@@ -9,6 +9,7 @@ import { ResultsView } from "@/components/results/ResultsView";
 import { ExamCreator } from "@/components/exam/ExamCreator";
 import { ExamView } from "@/components/exam/ExamView";
 import { useToast } from "@/hooks/use-toast";
+import { ErrorBoundary } from "@/components/exam/ErrorBoundary";
 
 interface User {
   name: string;
@@ -107,12 +108,15 @@ const Index = () => {
   };
 
   if (currentView === "exam" && currentExamId) {
+    console.log('Rendering exam with ID:', currentExamId);
     return (
-      <ExamInterface
-        examId={currentExamId}
-        onSubmitExam={handleSubmitExam}
-        onExitExam={handleExitExam}
-      />
+      <ErrorBoundary onError={handleExitExam}>
+        <ExamInterface
+          examId={currentExamId}
+          onSubmitExam={handleSubmitExam}
+          onExitExam={handleExitExam}
+        />
+      </ErrorBoundary>
     );
   }
 
