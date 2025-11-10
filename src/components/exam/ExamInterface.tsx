@@ -48,6 +48,32 @@ export const ExamInterface = ({ examId, onSubmitExam, onExitExam }: ExamInterfac
   const [timeLeft, setTimeLeft] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [startTime] = useState(Date.now());
+  const [hasExistingSubmission, setHasExistingSubmission] = useState(false);
+
+  // Check for existing submission when component mounts
+  useEffect(() => {
+    const checkExistingSubmission = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { data: existingSubmission } = await supabase
+          .from('submissions')
+          .select('id')
+          .eq('exam_id', examId)
+          .eq('student_id', user.id)
+          .maybeSingle();
+
+        if (existingSubmission) {
+          setHasExistingSubmission(true);
+        }
+      } catch (error) {
+        console.error('Error checking for existing submission:', error);
+      }
+    };
+
+    checkExistingSubmission();
+  }, [examId]);
 
   // Memoized submit handler
   const handleSubmit = useCallback(async () => {
@@ -195,6 +221,16 @@ export const ExamInterface = ({ examId, onSubmitExam, onExitExam }: ExamInterfac
   if (!examData.questions || examData.questions.length === 0) {
     console.error('Exam has no questions:', examData);
     return <ErrorState message="This exam has no questions yet. Please contact your teacher." onBack={onExitExam} />;
+  }
+
+  // Check if student has already submitted this exam
+  if (hasExistingSubmission) {
+    return (
+      <ErrorState 
+        message="You have already submitted this exam. You cannot take it again." 
+        onBack={onExitExam} 
+      />
+    );
   }
   
   console.log('Rendering exam interface with', examData.questions.length, 'questions');
