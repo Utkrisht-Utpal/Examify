@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -49,13 +49,123 @@ export const ExamInterface = ({ examId, onSubmitExam, onExitExam }: ExamInterfac
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [startTime] = useState(Date.now());
 
+  // Memoized submit handler
+  const handleSubmit = useCallback(async () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    const timeSpent = Math.floor((Date.now() - startTime) / 1000);
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      // Calculate results
+      let totalScore = 0;
+      let correctAnswers = 0;
+      const maxScore = examData?.total_marks || 0;
+
+      examData?.questions?.forEach((question: any) => {
+        const userAnswer = answers[question.id];
+        if (!userAnswer) return;
+
+        if (question.question_type === "mcq") {
+          if (userAnswer === question.correct_answer) {
+            totalScore += question.points;
+            correctAnswers++;
+          }
+        } else {
+          if (userAnswer.length > 50) {
+            totalScore += Math.floor(question.points * 0.75);
+            correctAnswers++;
+          } else if (userAnswer.length > 20) {
+            totalScore += Math.floor(question.points * 0.5);
+          }
+        }
+      });
+
+      const results = {
+        totalScore,
+        maxScore,
+        correctAnswers,
+        incorrectAnswers: (examData?.questions?.length || 0) - correctAnswers,
+        percentage: Math.round((totalScore / maxScore) * 100),
+        answers
+      };
+
+      // Save submission
+      const { data: submission, error: submissionError } = await supabase
+        .from('submissions')
+        .insert({
+          exam_id: examId,
+          student_id: user.id,
+          answers: answers,
+          time_taken: timeSpent
+        })
+        .select()
+        .single();
+
+      if (submissionError) throw submissionError;
+      
+      // Save results
+      const { error: resultError } = await supabase
+        .from('results')
+        .insert({
+          submission_id: submission.id,
+          exam_id: examId,
+          student_id: user.id,
+          score: results.totalScore,
+          total_marks: results.maxScore,
+          percentage: results.percentage
+        });
+
+      if (resultError) throw resultError;
+
+      toast({
+        title: "Exam Submitted Successfully!",
+        description: `Score: ${results.totalScore}/${results.maxScore} (${results.percentage}%)`
+      });
+
+      onSubmitExam(results);
+    } catch (error: any) {
+      toast({
+        title: "Submission Error",
+        description: error.message || "Failed to submit exam",
+        variant: "destructive"
+      });
+      setIsSubmitting(false);
+    }
+  }, [examData, answers, examId, startTime, isSubmitting, toast, onSubmitExam]);
+
   // Initialize timer when exam data loads
   useEffect(() => {
     if (examData && examData.is_timed) {
       console.log('Setting timer for', examData.duration, 'minutes');
-      setTimeLeft(examData.duration * 60); // Convert minutes to seconds
+      setTimeLeft(examData.duration * 60);
     }
   }, [examData]);
+
+  // Timer effect - only for timed exams
+  useEffect(() => {
+    if (!examData?.is_timed || timeLeft <= 0) return;
+
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [examData?.is_timed]);
+
+  // Auto-submit effect when time runs out
+  useEffect(() => {
+    if (timeLeft === 0 && examData?.is_timed && !isSubmitting) {
+      handleSubmit();
+    }
+  }, [timeLeft, examData?.is_timed, isSubmitting, handleSubmit]);
 
   // Show loading state
   if (isLoading) {
@@ -108,32 +218,6 @@ export const ExamInterface = ({ examId, onSubmitExam, onExitExam }: ExamInterfac
     );
   }
 
-  // Timer effect - only for timed exams
-  useEffect(() => {
-    if (!examData?.is_timed || timeLeft <= 0) return;
-
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [examData?.is_timed]); // Only depend on is_timed, not timeLeft
-
-  // Auto-submit effect when time runs out
-  useEffect(() => {
-    if (timeLeft === 0 && examData?.is_timed && !isSubmitting) {
-      const timer = setTimeout(() => {
-        handleSubmit();
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [timeLeft, examData?.is_timed]);
-
   const formatTime = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
@@ -146,96 +230,6 @@ export const ExamInterface = ({ examId, onSubmitExam, onExitExam }: ExamInterfac
       ...prev,
       [questionId]: answer
     }));
-  };
-
-  const calculateResults = () => {
-    let totalScore = 0;
-    let correctAnswers = 0;
-    const maxScore = examData.total_marks;
-
-    examData.questions.forEach((question: any) => {
-      const userAnswer = answers[question.id];
-      if (!userAnswer) return;
-
-      if (question.question_type === "mcq") {
-        if (userAnswer === question.correct_answer) {
-          totalScore += question.points;
-          correctAnswers++;
-        }
-      } else {
-        // For descriptive, give partial marks based on answer length
-        if (userAnswer.length > 50) {
-          totalScore += Math.floor(question.points * 0.75);
-          correctAnswers++;
-        } else if (userAnswer.length > 20) {
-          totalScore += Math.floor(question.points * 0.5);
-        }
-      }
-    });
-
-    return {
-      totalScore,
-      maxScore,
-      correctAnswers,
-      incorrectAnswers: examData.questions.length - correctAnswers,
-      percentage: Math.round((totalScore / maxScore) * 100),
-      answers
-    };
-  };
-
-  const handleSubmit = async () => {
-    setIsSubmitting(true);
-    const timeSpent = Math.floor((Date.now() - startTime) / 1000); // in seconds
-    
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
-
-      // Save submission
-      const { data: submission, error: submissionError } = await supabase
-        .from('submissions')
-        .insert({
-          exam_id: examId,
-          student_id: user.id,
-          answers: answers,
-          time_taken: timeSpent
-        })
-        .select()
-        .single();
-
-      if (submissionError) throw submissionError;
-
-      // Calculate results
-      const results = calculateResults();
-      
-      // Save results
-      const { error: resultError } = await supabase
-        .from('results')
-        .insert({
-          submission_id: submission.id,
-          exam_id: examId,
-          student_id: user.id,
-          score: results.totalScore,
-          total_marks: results.maxScore,
-          percentage: results.percentage
-        });
-
-      if (resultError) throw resultError;
-
-      toast({
-        title: "Exam Submitted Successfully!",
-        description: `Score: ${results.totalScore}/${results.maxScore} (${results.percentage}%)`
-      });
-
-      onSubmitExam(results);
-    } catch (error: any) {
-      toast({
-        title: "Submission Error",
-        description: error.message || "Failed to submit exam",
-        variant: "destructive"
-      });
-      setIsSubmitting(false);
-    }
   };
 
   const getTimeColor = () => {
