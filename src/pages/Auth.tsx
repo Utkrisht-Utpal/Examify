@@ -65,7 +65,7 @@ const Auth = ({ signIn, signUp }: AuthProps) => {
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary-foreground text-primary">
                 <BookOpen className="h-6 w-6" />
               </div>
-              <h1 className="text-3xl font-bold">ExamPortal</h1>
+              <h1 className="text-3xl font-bold">Examify</h1>
             </div>
             
             <h2 className="text-4xl font-bold mb-6">
@@ -109,7 +109,7 @@ const Auth = ({ signIn, signUp }: AuthProps) => {
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
                   <BookOpen className="h-5 w-5" />
                 </div>
-                <span className="text-2xl font-bold">ExamPortal</span>
+                <span className="text-2xl font-bold">Examify</span>
               </div>
               <p className="text-muted-foreground">Online Examination System</p>
             </div>
