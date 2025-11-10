@@ -1,0 +1,322 @@
+import { useState, useEffect } from "react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
+import { 
+  ArrowLeft, 
+  CheckCircle, 
+  XCircle, 
+  Clock,
+  User,
+  Calendar,
+  FileText,
+  Save
+} from "lucide-react";
+import { useGrading } from "@/hooks/useGrading";
+import { Skeleton } from "@/components/ui/skeleton";
+
+interface GradingInterfaceProps {
+  submissionId: string;
+  onBack: () => void;
+}
+
+interface QuestionGrade {
+  questionId: string;
+  points: number;
+  maxPoints: number;
+}
+
+export const GradingInterface = ({ submissionId, onBack }: GradingInterfaceProps) => {
+  const { fetchSubmissionDetails, gradeSubmission } = useGrading();
+  const [isLoading, setIsLoading] = useState(true);
+  const [submissionData, setSubmissionData] = useState<any>(null);
+  const [questionGrades, setQuestionGrades] = useState<Record<string, number>>({});
+  const [feedback, setFeedback] = useState("");
+  const [totalScore, setTotalScore] = useState(0);
+
+  useEffect(() => {
+    const loadSubmission = async () => {
+      try {
+        const data = await fetchSubmissionDetails(submissionId);
+        setSubmissionData(data);
+        
+        // Initialize grades based on correct/incorrect answers
+        const initialGrades: Record<string, number> = {};
+        let autoScore = 0;
+        
+        data.questions.forEach((eq: any) => {
+          const question = eq.questions;
+          const userAnswer = data.submission.answers[question.id] || '';
+          const isCorrect = userAnswer.toLowerCase().trim() === question.correct_answer.toLowerCase().trim();
+          const points = isCorrect ? question.points : 0;
+          initialGrades[question.id] = points;
+          autoScore += points;
+        });
+        
+        setQuestionGrades(initialGrades);
+        setTotalScore(autoScore);
+      } catch (error) {
+        console.error('Error loading submission:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadSubmission();
+  }, [submissionId]);
+
+  const handleGradeChange = (questionId: string, points: number, maxPoints: number) => {
+    const validPoints = Math.max(0, Math.min(points, maxPoints));
+    setQuestionGrades(prev => ({
+      ...prev,
+      [questionId]: validPoints
+    }));
+    
+    // Recalculate total
+    const newTotal = Object.entries({
+      ...questionGrades,
+      [questionId]: validPoints
+    }).reduce((sum, [_, pts]) => sum + pts, 0);
+    setTotalScore(newTotal);
+  };
+
+  const handleSubmitGrade = async () => {
+    if (!submissionData) return;
+
+    await gradeSubmission.mutateAsync({
+      submissionId: submissionData.submission.id,
+      examId: submissionData.submission.exam_id,
+      studentId: submissionData.submission.student_id,
+      score: totalScore,
+      totalMarks: submissionData.submission.exams.total_marks,
+      feedback
+    });
+
+    onBack();
+  };
+
+  if (isLoading) {
+    return (
+      <div className="p-6 space-y-6">
+        <Skeleton className="h-12 w-64" />
+        <Skeleton className="h-96" />
+      </div>
+    );
+  }
+
+  if (!submissionData) {
+    return (
+      <div className="p-6">
+        <Button variant="outline" onClick={onBack}>
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back
+        </Button>
+        <Card className="mt-4">
+          <CardContent className="py-12 text-center">
+            <p className="text-muted-foreground">Submission not found</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const { submission, questions } = submissionData;
+  const percentage = Math.round((totalScore / submission.exams.total_marks) * 100);
+
+  return (
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button variant="outline" onClick={onBack}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Dashboard
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold">Grade Submission</h1>
+            <p className="text-muted-foreground">Review and assign marks</p>
+          </div>
+        </div>
+        <Button onClick={handleSubmitGrade} disabled={gradeSubmission.isPending}>
+          <Save className="h-4 w-4 mr-2" />
+          Save Grade
+        </Button>
+      </div>
+
+      {/* Student Info Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Submission Details</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <div className="flex items-center gap-2">
+              <User className="h-4 w-4 text-muted-foreground" />
+              <div>
+                <p className="text-sm font-medium">Student</p>
+                <p className="text-sm text-muted-foreground">{submission.profiles.full_name}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <FileText className="h-4 w-4 text-muted-foreground" />
+              <div>
+                <p className="text-sm font-medium">Exam</p>
+                <p className="text-sm text-muted-foreground">{submission.exams.title}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+              <div>
+                <p className="text-sm font-medium">Submitted</p>
+                <p className="text-sm text-muted-foreground">
+                  {new Date(submission.submitted_at).toLocaleString()}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Clock className="h-4 w-4 text-muted-foreground" />
+              <div>
+                <p className="text-sm font-medium">Time Taken</p>
+                <p className="text-sm text-muted-foreground">{submission.time_taken || 0} minutes</p>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Score Summary */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-muted-foreground">Total Score</p>
+              <p className="text-3xl font-bold">
+                {totalScore} / {submission.exams.total_marks}
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="text-sm text-muted-foreground">Percentage</p>
+              <p className="text-3xl font-bold text-primary">{percentage}%</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Questions Grading */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Question-wise Grading</CardTitle>
+          <CardDescription>Review answers and assign marks for each question</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-6">
+            {questions.map((eq: any, index: number) => {
+              const question = eq.questions;
+              const userAnswer = submission.answers[question.id] || '';
+              const isCorrect = userAnswer.toLowerCase().trim() === question.correct_answer.toLowerCase().trim();
+              
+              return (
+                <div key={question.id} className="border rounded-lg p-4 space-y-4">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="font-semibold">Question {index + 1}</span>
+                        <Badge variant={isCorrect ? "default" : "secondary"}>
+                          {question.question_type}
+                        </Badge>
+                        <span className="text-sm text-muted-foreground">
+                          Max: {question.points} points
+                        </span>
+                      </div>
+                      <p className="text-sm mb-3">{question.question_text}</p>
+                      
+                      <div className="space-y-2">
+                        <div>
+                          <p className="text-sm font-medium">Student's Answer:</p>
+                          <div className={`p-3 rounded-md border ${
+                            isCorrect ? 'bg-success/10 border-success' : 'bg-muted'
+                          }`}>
+                            <p className="text-sm">{userAnswer || 'No answer provided'}</p>
+                          </div>
+                        </div>
+                        
+                        <div>
+                          <p className="text-sm font-medium">Correct Answer:</p>
+                          <div className="p-3 rounded-md bg-success/10 border border-success">
+                            <p className="text-sm">{question.correct_answer}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  <div className="flex items-center gap-4">
+                    <div className="flex-1">
+                      <Label htmlFor={`points-${question.id}`}>Assign Points</Label>
+                      <Input
+                        id={`points-${question.id}`}
+                        type="number"
+                        min={0}
+                        max={question.points}
+                        value={questionGrades[question.id] || 0}
+                        onChange={(e) => handleGradeChange(
+                          question.id,
+                          parseInt(e.target.value) || 0,
+                          question.points
+                        )}
+                        className="w-32"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {isCorrect ? (
+                        <Badge className="bg-success text-success-foreground">
+                          <CheckCircle className="h-3 w-3 mr-1" />
+                          Auto-graded: Correct
+                        </Badge>
+                      ) : (
+                        <Badge variant="secondary">
+                          <XCircle className="h-3 w-3 mr-1" />
+                          Needs review
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Feedback Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Feedback (Optional)</CardTitle>
+          <CardDescription>Provide detailed feedback to the student</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Textarea
+            placeholder="Enter your feedback here..."
+            value={feedback}
+            onChange={(e) => setFeedback(e.target.value)}
+            rows={6}
+          />
+        </CardContent>
+      </Card>
+
+      {/* Submit Button */}
+      <div className="flex justify-end">
+        <Button onClick={handleSubmitGrade} disabled={gradeSubmission.isPending} size="lg">
+          <Save className="h-4 w-4 mr-2" />
+          {gradeSubmission.isPending ? 'Saving...' : 'Save Grade and Submit'}
+        </Button>
+      </div>
+    </div>
+  );
+};

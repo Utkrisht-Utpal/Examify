@@ -3,9 +3,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { PlusCircle, BookOpen, Users, BarChart3, FileText, Calendar, Eye } from "lucide-react";
+import { PlusCircle, BookOpen, Users, BarChart3, FileText, Calendar, Eye, Clock } from "lucide-react";
 import { useExams } from "@/hooks/useExams";
 import { useSubmissions } from "@/hooks/useSubmissions";
+import { useGrading } from "@/hooks/useGrading";
 import { supabase } from "@/integrations/supabase/client";
 
 interface TeacherDashboardProps {
@@ -17,11 +18,13 @@ interface TeacherDashboardProps {
   onCreateExam: () => void;
   onViewResults: () => void;
   onViewExam: (examId: string) => void;
+  onGradeSubmission: (submissionId: string) => void;
 }
 
-export const TeacherDashboard = ({ user, onCreateExam, onViewResults, onViewExam }: TeacherDashboardProps) => {
+export const TeacherDashboard = ({ user, onCreateExam, onViewResults, onViewExam, onGradeSubmission }: TeacherDashboardProps) => {
   const { exams, isLoading: examsLoading, updateExamStatus } = useExams();
   const { submissions } = useSubmissions();
+  const { pendingSubmissions, isLoadingSubmissions } = useGrading();
   
   // Get current user ID from Supabase
   const [userId, setUserId] = React.useState<string | null>(null);
@@ -183,6 +186,12 @@ export const TeacherDashboard = ({ user, onCreateExam, onViewResults, onViewExam
       <Tabs defaultValue="exams" className="space-y-4">
         <TabsList>
           <TabsTrigger value="exams">My Exams</TabsTrigger>
+          <TabsTrigger value="grading">
+            Pending Grading
+            {pendingSubmissions && pendingSubmissions.length > 0 && (
+              <Badge variant="destructive" className="ml-2">{pendingSubmissions.length}</Badge>
+            )}
+          </TabsTrigger>
           <TabsTrigger value="activity">Recent Activity</TabsTrigger>
         </TabsList>
 
@@ -256,6 +265,80 @@ export const TeacherDashboard = ({ user, onCreateExam, onViewResults, onViewExam
                       </div>
                     </div>
                   ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="grading" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Pending Grading</CardTitle>
+              <CardDescription>Review and grade student submissions</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoadingSubmissions ? (
+                <p className="text-center text-muted-foreground py-4">Loading submissions...</p>
+              ) : !pendingSubmissions || pendingSubmissions.length === 0 ? (
+                <p className="text-center text-muted-foreground py-4">No submissions pending grading</p>
+              ) : (
+                <div className="space-y-4">
+                  {pendingSubmissions.map((submission: any) => {
+                    const hasResult = submission.results && submission.results.length > 0;
+                    const isGraded = hasResult && submission.results[0].graded_at;
+                    
+                    return (
+                      <div key={submission.id} className="flex items-center justify-between p-4 border rounded-lg">
+                        <div className="space-y-2 flex-1">
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-semibold">{submission.profiles.full_name}</h3>
+                            {isGraded ? (
+                              <Badge variant="outline" className="bg-success/10 text-success">
+                                Graded
+                              </Badge>
+                            ) : (
+                              <Badge variant="destructive">
+                                Pending
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                            <div className="flex items-center gap-1">
+                              <BookOpen className="h-3 w-3" />
+                              {submission.exams.title}
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Calendar className="h-3 w-3" />
+                              {new Date(submission.submitted_at).toLocaleString()}
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              {submission.time_taken || 0} min
+                            </div>
+                          </div>
+                          {isGraded && (
+                            <div className="text-sm">
+                              <span className="text-muted-foreground">Score: </span>
+                              <span className="font-medium">
+                                {submission.results[0].score}/{submission.results[0].total_marks}
+                              </span>
+                              <span className="text-muted-foreground ml-2">
+                                ({submission.results[0].percentage}%)
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        <Button 
+                          variant={isGraded ? "outline" : "default"} 
+                          size="sm"
+                          onClick={() => onGradeSubmission(submission.id)}
+                        >
+                          {isGraded ? 'Review' : 'Grade Now'}
+                        </Button>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </CardContent>

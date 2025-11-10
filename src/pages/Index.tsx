@@ -8,6 +8,7 @@ import { ExamInterface } from "@/components/exam/ExamInterface";
 import { ResultsView } from "@/components/results/ResultsView";
 import { ExamCreator } from "@/components/exam/ExamCreator";
 import { ExamView } from "@/components/exam/ExamView";
+import { GradingInterface } from "@/components/grading/GradingInterface";
 import { useToast } from "@/hooks/use-toast";
 import { ErrorBoundary } from "@/components/exam/ErrorBoundary";
 
@@ -19,8 +20,9 @@ interface User {
 
 const Index = () => {
   const { user: authUser, signOut, signIn, signUp, loading, roles } = useAuth();
-  const [currentView, setCurrentView] = useState<"dashboard" | "exam" | "results" | "create-exam" | "view-exam">("dashboard");
+  const [currentView, setCurrentView] = useState<"dashboard" | "exam" | "results" | "create-exam" | "view-exam" | "grading">("dashboard");
   const [currentExamId, setCurrentExamId] = useState<string | null>(null);
+  const [currentSubmissionId, setCurrentSubmissionId] = useState<string | null>(null);
   const [examResults, setExamResults] = useState<any>(null);
   const { toast } = useToast();
 
@@ -83,6 +85,16 @@ const Index = () => {
   const handleBackToDashboard = () => {
     setCurrentView("dashboard");
     setCurrentExamId(null);
+    setCurrentSubmissionId(null);
+  };
+
+  const handleGradeSubmission = (submissionId: string) => {
+    setCurrentSubmissionId(submissionId);
+    setCurrentView("grading");
+    toast({
+      title: "Grading",
+      description: "Opening grading interface...",
+    });
   };
 
   if (loading) {
@@ -152,6 +164,18 @@ const Index = () => {
     );
   }
 
+  if (currentView === "grading" && currentSubmissionId) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header user={user} onLogout={handleLogout} />
+        <GradingInterface 
+          submissionId={currentSubmissionId}
+          onBack={handleBackToDashboard}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <Header user={user} onLogout={handleLogout} />
@@ -171,6 +195,7 @@ const Index = () => {
             onCreateExam={handleCreateExam}
             onViewResults={handleViewResults}
             onViewExam={handleViewExam}
+            onGradeSubmission={handleGradeSubmission}
           />
         )}
         
