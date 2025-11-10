@@ -37,7 +37,7 @@ interface ExamInterfaceProps {
 
 export const ExamInterface = ({ examId, onSubmitExam, onExitExam }: ExamInterfaceProps) => {
   const { toast } = useToast();
-  const { data: examData, isLoading } = useExamWithQuestions(examId);
+  const { data: examData, isLoading, error: examError } = useExamWithQuestions(examId);
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [timeLeft, setTimeLeft] = useState(0);
@@ -51,16 +51,30 @@ export const ExamInterface = ({ examId, onSubmitExam, onExitExam }: ExamInterfac
     }
   }, [examData]);
 
+  // Show loading state
   if (isLoading) {
     return <LoadingState />;
   }
 
-  if (!examData) {
-    return <ErrorState message="Exam not found" onBack={onExitExam} />;
+  // Show error if query failed
+  if (examError) {
+    console.error('Exam loading error:', examError);
+    return (
+      <ErrorState 
+        message={`Failed to load exam: ${examError instanceof Error ? examError.message : 'Unknown error'}`} 
+        onBack={onExitExam} 
+      />
+    );
   }
 
+  // Check if exam data exists
+  if (!examData) {
+    return <ErrorState message="Exam not found. Please contact your teacher." onBack={onExitExam} />;
+  }
+
+  // Check if exam has questions
   if (!examData.questions || examData.questions.length === 0) {
-    return <ErrorState message="This exam has no questions" onBack={onExitExam} />;
+    return <ErrorState message="This exam has no questions yet. Please contact your teacher." onBack={onExitExam} />;
   }
 
   // Check if exam is scheduled and not yet available

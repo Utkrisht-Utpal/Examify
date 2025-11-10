@@ -76,71 +76,109 @@ export const useExamWithQuestions = (examId: string) => {
   return useQuery({
     queryKey: ['exam', examId],
     queryFn: async () => {
-      const { data: exam, error: examError } = await supabase
-        .from('exams')
-        .select('*')
-        .eq('id', examId)
-        .maybeSingle();
-      
-      if (examError) throw examError;
-      if (!exam) throw new Error('Exam not found');
+      try {
+        const { data: exam, error: examError } = await supabase
+          .from('exams')
+          .select('*')
+          .eq('id', examId)
+          .maybeSingle();
+        
+        if (examError) {
+          console.error('Error fetching exam:', examError);
+          throw new Error(`Failed to load exam: ${examError.message}`);
+        }
+        if (!exam) throw new Error('Exam not found');
 
-      // Get exam_questions to get the order
-      const { data: examQuestions, error: eqError } = await supabase
-        .from('exam_questions')
-        .select('question_id, order_number')
-        .eq('exam_id', examId)
-        .order('order_number');
-      
-      if (eqError) throw eqError;
+        // Get exam_questions to get the order
+        const { data: examQuestions, error: eqError } = await supabase
+          .from('exam_questions')
+          .select('question_id, order_number')
+          .eq('exam_id', examId)
+          .order('order_number');
+        
+        if (eqError) {
+          console.error('Error fetching exam questions mapping:', eqError);
+          throw new Error(`Failed to load exam questions: ${eqError.message}`);
+        }
 
-      if (!examQuestions || examQuestions.length === 0) {
+        if (!examQuestions || examQuestions.length === 0) {
+          return {
+            ...exam,
+            questions: []
+          };
+        }
+
+        // Get questions separately with proper RLS
+        const questionIds = examQuestions.map(eq => eq.question_id);
+        const { data: questions, error: questionsError } = await supabase
+          .from('questions')
+          .select('*')
+          .in('id', questionIds);
+        
+        if (questionsError) {
+          console.error('Error fetching questions:', questionsError);
+          throw new Error(`Failed to load questions: ${questionsError.message}`);
+        }
+
+        if (!questions || questions.length === 0) {
+          console.warn('No questions found for exam', examId);
+          return {
+            ...exam,
+            questions: []
+          };
+        }
+
+        // Check if user is a student - if so, remove correct_answer field
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          throw new Error('User not authenticated');
+        }
+
+        const { data: userRoles, error: rolesError } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id);
+        
+        if (rolesError) {
+          console.error('Error fetching user roles:', rolesError);
+        }
+        
+        const isStudent = userRoles?.some(r => r.role === 'student');
+        
+        // Map questions back in the correct order and sanitize for students
+        const orderedQuestions = examQuestions
+          .map(eq => {
+            const question = questions?.find(q => q.id === eq.question_id);
+            if (!question) {
+              console.warn('Question not found:', eq.question_id);
+              return null;
+            }
+            
+            // Remove correct_answer for students to prevent cheating
+            if (isStudent) {
+              const { correct_answer, ...sanitizedQuestion } = question;
+              return sanitizedQuestion;
+            }
+            
+            return question;
+          })
+          .filter(q => q !== null && q !== undefined);
+
+        if (orderedQuestions.length === 0) {
+          console.error('No questions could be loaded after ordering');
+        }
+
         return {
           ...exam,
-          questions: []
+          questions: orderedQuestions
         };
+      } catch (error) {
+        console.error('Error in useExamWithQuestions:', error);
+        throw error;
       }
-
-      // Get questions separately with proper RLS
-      const questionIds = examQuestions.map(eq => eq.question_id);
-      const { data: questions, error: questionsError } = await supabase
-        .from('questions')
-        .select('*')
-        .in('id', questionIds);
-      
-      if (questionsError) throw questionsError;
-
-      // Check if user is a student - if so, remove correct_answer field
-      const { data: { user } } = await supabase.auth.getUser();
-      const { data: userRoles } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user?.id || '');
-      
-      const isStudent = userRoles?.some(r => r.role === 'student');
-      
-      // Map questions back in the correct order and sanitize for students
-      const orderedQuestions = examQuestions
-        .map(eq => {
-          const question = questions?.find(q => q.id === eq.question_id);
-          if (!question) return null;
-          
-          // Remove correct_answer for students to prevent cheating
-          if (isStudent) {
-            const { correct_answer, ...sanitizedQuestion } = question;
-            return sanitizedQuestion;
-          }
-          
-          return question;
-        })
-        .filter(q => q !== null && q !== undefined);
-
-      return {
-        ...exam,
-        questions: orderedQuestions
-      };
     },
     enabled: !!examId,
-    retry: 1
+    retry: 2,
+    staleTime: 1000 * 60 * 5 // Cache for 5 minutes
   });
 };
