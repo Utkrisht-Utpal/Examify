@@ -30,7 +30,7 @@ export const Header = ({ user, onLogout }: HeaderProps) => {
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
               <BookOpen className="h-4 w-4" />
             </div>
-            <span className="text-lg font-semibold">ExamPortal</span>
+            <span className="text-lg font-semibold">Examify</span>
           </div>
         </div>
 

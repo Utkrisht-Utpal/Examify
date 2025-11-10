@@ -1,4 +1,4 @@
-# Welcome to My Online Exam System project
+# Welcome to Examify
 
 ## Project info
 
