@@ -163,7 +163,8 @@ export const ExamInterface = ({ examId, onSubmitExam, onExitExam }: ExamInterfac
   // Auto-submit effect when time runs out
   useEffect(() => {
     if (timeLeft === 0 && examData?.is_timed && !isSubmitting) {
-      handleSubmit();
+      console.log('Time expired, auto-submitting exam');
+      setTimeout(() => handleSubmit(), 0);
     }
   }, [timeLeft, examData?.is_timed, isSubmitting, handleSubmit]);
 
