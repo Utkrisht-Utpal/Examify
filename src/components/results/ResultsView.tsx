@@ -1,21 +1,19 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
+import { Skeleton } from "@/components/ui/skeleton";
 import { 
   ArrowLeft, 
   Trophy, 
   Clock, 
   CheckCircle, 
   XCircle, 
-  BarChart3,
-  TrendingUp,
-  Users,
-  Calendar,
-  Download
+  BarChart3
 } from "lucide-react";
+import { useResults } from "@/hooks/useResults";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ResultsViewProps {
   user: {
@@ -39,174 +37,120 @@ interface StudentResult {
   percentage: number;
   timeSpent: string;
   submittedAt: string;
-  rank: number;
-  totalStudents: number;
   questionAnalysis: {
     questionId: string;
     question: string;
     yourAnswer: string;
     correctAnswer: string;
     isCorrect: boolean;
-    timeSpent: string;
-  }[];
-}
-
-interface TeacherAnalytics {
-  examId: string;
-  examTitle: string;
-  subject: string;
-  totalStudents: number;
-  completedStudents: number;
-  averageScore: number;
-  highestScore: number;
-  lowestScore: number;
-  averageTime: string;
-  difficultyAnalysis: {
-    questionId: string;
-    question: string;
-    correctRate: number;
-    averageTime: string;
-    difficulty: "easy" | "medium" | "hard";
-  }[];
-  studentPerformance: {
-    studentName: string;
-    score: number;
-    percentage: number;
-    timeSpent: string;
-    submittedAt: string;
   }[];
 }
 
 export const ResultsView = ({ user, onBack }: ResultsViewProps) => {
-  // Sample student results data
-  const [studentResults] = useState<StudentResult[]>([
-    {
-      examId: "1",
-      examTitle: "Mathematics Final Exam",
-      subject: "Mathematics", 
-      totalQuestions: 5,
-      correctAnswers: 4,
-      incorrectAnswers: 1,
-      unanswered: 0,
-      score: 80,
-      maxScore: 100,
-      percentage: 80,
-      timeSpent: "1h 25m",
-      submittedAt: "2024-01-20 11:25",
-      rank: 12,
-      totalStudents: 45,
-      questionAnalysis: [
-        {
-          questionId: "1",
-          question: "What is the derivative of x² + 3x + 2?",
-          yourAnswer: "2x + 3",
-          correctAnswer: "2x + 3", 
-          isCorrect: true,
-          timeSpent: "2m 15s"
-        },
-        {
-          questionId: "2",
-          question: "If f(x) = sin(x), what is f'(x)?",
-          yourAnswer: "cos(x)",
-          correctAnswer: "cos(x)",
-          isCorrect: true,
-          timeSpent: "1m 45s"
-        },
-        {
-          questionId: "3", 
-          question: "Explain the fundamental theorem of calculus...",
-          yourAnswer: "The fundamental theorem connects differentiation and integration...",
-          correctAnswer: "Full explanation of fundamental theorem...",
-          isCorrect: true,
-          timeSpent: "15m 30s"
-        },
-        {
-          questionId: "4",
-          question: "What is the integral of 2x dx?",
-          yourAnswer: "x² + C",
-          correctAnswer: "x² + C",
-          isCorrect: true,
-          timeSpent: "3m 20s"
-        },
-        {
-          questionId: "5",
-          question: "Solve the differential equation dy/dx = 2x...",
-          yourAnswer: "y = x² + C (incomplete solution)",
-          correctAnswer: "y = x² + C with detailed steps...",
-          isCorrect: false,
-          timeSpent: "12m 45s"
-        }
-      ]
-    }
-  ]);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [detailedResults, setDetailedResults] = useState<StudentResult[]>([]);
+  const [isLoadingDetails, setIsLoadingDetails] = useState(true);
 
-  // Sample teacher analytics data
-  const [teacherAnalytics] = useState<TeacherAnalytics[]>([
-    {
-      examId: "1",
-      examTitle: "Mathematics Final Exam", 
-      subject: "Mathematics",
-      totalStudents: 45,
-      completedStudents: 42,
-      averageScore: 75.5,
-      highestScore: 95,
-      lowestScore: 45,
-      averageTime: "1h 35m",
-      difficultyAnalysis: [
-        {
-          questionId: "1",
-          question: "What is the derivative of x² + 3x + 2?",
-          correctRate: 85,
-          averageTime: "2m 30s",
-          difficulty: "easy"
-        },
-        {
-          questionId: "2", 
-          question: "If f(x) = sin(x), what is f'(x)?",
-          correctRate: 78,
-          averageTime: "2m 15s",
-          difficulty: "medium"
-        },
-        {
-          questionId: "3",
-          question: "Explain the fundamental theorem of calculus...", 
-          correctRate: 65,
-          averageTime: "18m 20s",
-          difficulty: "hard"
-        },
-        {
-          questionId: "4",
-          question: "What is the integral of 2x dx?",
-          correctRate: 82,
-          averageTime: "3m 45s", 
-          difficulty: "medium"
-        },
-        {
-          questionId: "5",
-          question: "Solve the differential equation dy/dx = 2x...",
-          correctRate: 55,
-          averageTime: "15m 10s",
-          difficulty: "hard"
-        }
-      ],
-      studentPerformance: [
-        { studentName: "Alice Johnson", score: 95, percentage: 95, timeSpent: "1h 20m", submittedAt: "2024-01-20 11:20" },
-        { studentName: "Bob Smith", score: 88, percentage: 88, timeSpent: "1h 45m", submittedAt: "2024-01-20 11:45" },
-        { studentName: "Carol Davis", score: 82, percentage: 82, timeSpent: "1h 30m", submittedAt: "2024-01-20 11:30" },
-        { studentName: "David Wilson", score: 75, percentage: 75, timeSpent: "1h 55m", submittedAt: "2024-01-20 11:55" },
-        { studentName: "Emma Brown", score: 70, percentage: 70, timeSpent: "1h 40m", submittedAt: "2024-01-20 11:40" }
-      ]
-    }
-  ]);
+  useEffect(() => {
+    const fetchUserId = async () => {
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (authUser) {
+        setUserId(authUser.id);
+      }
+    };
+    fetchUserId();
+  }, []);
 
-  const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty) {
-      case "easy": return "bg-success text-success-foreground";
-      case "medium": return "bg-warning text-warning-foreground"; 
-      case "hard": return "bg-destructive text-destructive-foreground";
-      default: return "bg-secondary text-secondary-foreground";
-    }
-  };
+  const { results, isLoading } = useResults(userId || undefined);
+
+  useEffect(() => {
+    const fetchDetailedResults = async () => {
+      if (!results || results.length === 0) {
+        setIsLoadingDetails(false);
+        return;
+      }
+
+      try {
+        const detailedData = await Promise.all(
+          results.map(async (result: any) => {
+            // Fetch submission details with answers
+            const { data: submission } = await supabase
+              .from('submissions')
+              .select('answers, time_taken')
+              .eq('id', result.submission_id)
+              .single();
+
+            // Fetch exam questions
+            const { data: examQuestions } = await supabase
+              .from('exam_questions')
+              .select(`
+                question_id,
+                order_number,
+                questions (
+                  id,
+                  question_text,
+                  correct_answer,
+                  points,
+                  question_type
+                )
+              `)
+              .eq('exam_id', result.exam_id)
+              .order('order_number');
+
+            const answers = submission?.answers || {};
+            let correctAnswers = 0;
+            let incorrectAnswers = 0;
+            
+            const questionAnalysis = examQuestions?.map((eq: any) => {
+              const question = eq.questions;
+              const userAnswer = answers[question.id] || '';
+              const isCorrect = userAnswer.toLowerCase().trim() === question.correct_answer.toLowerCase().trim();
+              
+              if (isCorrect) correctAnswers++;
+              else if (userAnswer) incorrectAnswers++;
+
+              return {
+                questionId: question.id,
+                question: question.question_text,
+                yourAnswer: userAnswer || 'Not answered',
+                correctAnswer: question.correct_answer,
+                isCorrect
+              };
+            }) || [];
+
+            const timeInMinutes = submission?.time_taken || 0;
+            const hours = Math.floor(timeInMinutes / 60);
+            const minutes = timeInMinutes % 60;
+            const timeSpent = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+
+            return {
+              examId: result.exam_id,
+              examTitle: result.exams?.title || 'Unknown Exam',
+              subject: result.exams?.subject || 'Unknown Subject',
+              totalQuestions: examQuestions?.length || 0,
+              correctAnswers,
+              incorrectAnswers,
+              unanswered: (examQuestions?.length || 0) - correctAnswers - incorrectAnswers,
+              score: result.score,
+              maxScore: result.total_marks,
+              percentage: result.percentage,
+              timeSpent,
+              submittedAt: new Date(result.created_at).toLocaleString(),
+              questionAnalysis
+            };
+          })
+        );
+
+        setDetailedResults(detailedData);
+      } catch (error) {
+        console.error('Error fetching detailed results:', error);
+      } finally {
+        setIsLoadingDetails(false);
+      }
+    };
+
+    fetchDetailedResults();
+  }, [results]);
 
   const getScoreColor = (percentage: number) => {
     if (percentage >= 90) return "text-success";
@@ -216,7 +160,39 @@ export const ResultsView = ({ user, onBack }: ResultsViewProps) => {
   };
 
   if (user.role === "student") {
-    const result = studentResults[0]; // For demo, show first result
+    if (isLoading || isLoadingDetails) {
+      return (
+        <div className="p-6 space-y-6">
+          <Skeleton className="h-12 w-64" />
+          <div className="grid gap-4 md:grid-cols-4">
+            {[1, 2, 3, 4].map((i) => (
+              <Skeleton key={i} className="h-32" />
+            ))}
+          </div>
+          <Skeleton className="h-96" />
+        </div>
+      );
+    }
+
+    if (!detailedResults || detailedResults.length === 0) {
+      return (
+        <div className="p-6">
+          <Button variant="outline" onClick={onBack} className="mb-4">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Dashboard
+          </Button>
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-12">
+              <Trophy className="h-12 w-12 text-muted-foreground mb-4" />
+              <p className="text-lg font-medium mb-2">No Results Yet</p>
+              <p className="text-sm text-muted-foreground">Complete an exam to see your results here</p>
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
+
+    const result = detailedResults[0]; // Show most recent result
 
     return (
       <div className="p-6 space-y-6">
@@ -243,7 +219,7 @@ export const ResultsView = ({ user, onBack }: ResultsViewProps) => {
                 {result.score}/{result.maxScore}
               </div>
               <p className="text-xs text-muted-foreground">
-                {result.percentage}% - Rank {result.rank}/{result.totalStudents}
+                {result.percentage}%
               </p>
             </CardContent>
           </Card>
@@ -306,9 +282,6 @@ export const ResultsView = ({ user, onBack }: ResultsViewProps) => {
                       ) : (
                         <XCircle className="h-4 w-4 text-destructive" />
                       )}
-                      <Badge variant="outline" className="text-xs">
-                        {question.timeSpent}
-                      </Badge>
                     </div>
                   </div>
                   
@@ -341,154 +314,27 @@ export const ResultsView = ({ user, onBack }: ResultsViewProps) => {
     );
   }
 
-  // Teacher Analytics View
-  const analytics = teacherAnalytics[0]; // For demo, show first analytics
-
+  // Teacher Analytics View - Coming Soon
   return (
     <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="outline" onClick={onBack}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Dashboard
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold">Analytics & Results</h1>
-            <p className="text-muted-foreground">Comprehensive exam performance analysis</p>
-          </div>
-        </div>
-        <Button>
-          <Download className="h-4 w-4 mr-2" />
-          Export Results
+      <div className="flex items-center gap-4">
+        <Button variant="outline" onClick={onBack}>
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to Dashboard
         </Button>
+        <div>
+          <h1 className="text-3xl font-bold">Analytics & Results</h1>
+          <p className="text-muted-foreground">Comprehensive exam performance analysis</p>
+        </div>
       </div>
 
-      {/* Analytics Overview */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Completion Rate</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {analytics.completedStudents}/{analytics.totalStudents}
-            </div>
-            <Progress value={(analytics.completedStudents / analytics.totalStudents) * 100} className="mt-2" />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Average Score</CardTitle>
-            <BarChart3 className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-primary">{analytics.averageScore}%</div>
-            <p className="text-xs text-muted-foreground">
-              Range: {analytics.lowestScore}% - {analytics.highestScore}%
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Average Time</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{analytics.averageTime}</div>
-            <p className="text-xs text-muted-foreground">
-              Per student completion
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Performance</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-success">Good</div>
-            <p className="text-xs text-muted-foreground">
-              Above class average
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Tabs defaultValue="difficulty" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="difficulty">Question Analysis</TabsTrigger>
-          <TabsTrigger value="students">Student Performance</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="difficulty">
-          <Card>
-            <CardHeader>
-              <CardTitle>Question Difficulty Analysis</CardTitle>
-              <CardDescription>Performance breakdown by question</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {analytics.difficultyAnalysis.map((question, index) => (
-                  <div key={question.questionId} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">Q{index + 1}</span>
-                        <Badge className={getDifficultyColor(question.difficulty)}>
-                          {question.difficulty}
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-muted-foreground line-clamp-1">
-                        {question.question}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Avg. time: {question.averageTime}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className={`text-lg font-semibold ${getScoreColor(question.correctRate)}`}>
-                        {question.correctRate}%
-                      </p>
-                      <p className="text-xs text-muted-foreground">correct rate</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="students">
-          <Card>
-            <CardHeader>
-              <CardTitle>Individual Student Performance</CardTitle>
-              <CardDescription>Detailed scores and completion times</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {analytics.studentPerformance.map((student, index) => (
-                  <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-                    <div className="space-y-1">
-                      <p className="font-medium">{student.studentName}</p>
-                      <p className="text-xs text-muted-foreground">
-                        Submitted: {student.submittedAt} • Time: {student.timeSpent}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className={`text-lg font-semibold ${getScoreColor(student.percentage)}`}>
-                        {student.score}%
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+      <Card>
+        <CardContent className="flex flex-col items-center justify-center py-12">
+          <BarChart3 className="h-12 w-12 text-muted-foreground mb-4" />
+          <p className="text-lg font-medium mb-2">Teacher Analytics</p>
+          <p className="text-sm text-muted-foreground">Detailed analytics for exam results will be available soon</p>
+        </CardContent>
+      </Card>
     </div>
   );
 };
