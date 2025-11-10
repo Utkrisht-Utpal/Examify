@@ -77,18 +77,28 @@ export const useExamWithQuestions = (examId: string) => {
     queryKey: ['exam', examId],
     queryFn: async () => {
       try {
+        console.log('=== FETCHING EXAM ===');
+        console.log('Exam ID:', examId);
+        
         const { data: exam, error: examError } = await supabase
           .from('exams')
           .select('*')
           .eq('id', examId)
           .maybeSingle();
         
+        console.log('Exam data:', exam);
+        console.log('Exam error:', examError);
+        
         if (examError) {
           console.error('Error fetching exam:', examError);
           throw new Error(`Failed to load exam: ${examError.message}`);
         }
-        if (!exam) throw new Error('Exam not found');
+        if (!exam) {
+          console.error('No exam found with ID:', examId);
+          throw new Error('Exam not found');
+        }
 
+        console.log('=== FETCHING EXAM QUESTIONS MAPPING ===');
         // Get exam_questions to get the order
         const { data: examQuestions, error: eqError } = await supabase
           .from('exam_questions')
@@ -96,24 +106,34 @@ export const useExamWithQuestions = (examId: string) => {
           .eq('exam_id', examId)
           .order('order_number');
         
+        console.log('Exam questions mapping:', examQuestions);
+        console.log('Exam questions error:', eqError);
+        
         if (eqError) {
           console.error('Error fetching exam questions mapping:', eqError);
           throw new Error(`Failed to load exam questions: ${eqError.message}`);
         }
 
         if (!examQuestions || examQuestions.length === 0) {
+          console.warn('No exam questions found for exam:', examId);
           return {
             ...exam,
             questions: []
           };
         }
 
+        console.log('=== FETCHING QUESTIONS ===');
         // Get questions separately with proper RLS
         const questionIds = examQuestions.map(eq => eq.question_id);
+        console.log('Question IDs to fetch:', questionIds);
+        
         const { data: questions, error: questionsError } = await supabase
           .from('questions')
           .select('*')
           .in('id', questionIds);
+        
+        console.log('Questions data:', questions);
+        console.log('Questions error:', questionsError);
         
         if (questionsError) {
           console.error('Error fetching questions:', questionsError);
@@ -128,8 +148,11 @@ export const useExamWithQuestions = (examId: string) => {
           };
         }
 
+        console.log('=== CHECKING USER ROLE ===');
         // Check if user is a student - if so, remove correct_answer field
         const { data: { user } } = await supabase.auth.getUser();
+        console.log('Current user:', user?.email);
+        
         if (!user) {
           throw new Error('User not authenticated');
         }
@@ -139,11 +162,15 @@ export const useExamWithQuestions = (examId: string) => {
           .select('role')
           .eq('user_id', user.id);
         
+        console.log('User roles:', userRoles);
+        console.log('Roles error:', rolesError);
+        
         if (rolesError) {
           console.error('Error fetching user roles:', rolesError);
         }
         
         const isStudent = userRoles?.some(r => r.role === 'student');
+        console.log('Is student:', isStudent);
         
         // Map questions back in the correct order and sanitize for students
         const orderedQuestions = examQuestions
@@ -168,12 +195,20 @@ export const useExamWithQuestions = (examId: string) => {
           console.error('No questions could be loaded after ordering');
         }
 
-        return {
+        console.log('=== FINAL RESULT ===');
+        console.log('Total questions loaded:', orderedQuestions.length);
+        console.log('Questions:', orderedQuestions);
+
+        const result = {
           ...exam,
           questions: orderedQuestions
         };
+        
+        console.log('Returning exam with questions:', result);
+        return result;
       } catch (error) {
-        console.error('Error in useExamWithQuestions:', error);
+        console.error('=== ERROR IN useExamWithQuestions ===');
+        console.error('Error details:', error);
         throw error;
       }
     },

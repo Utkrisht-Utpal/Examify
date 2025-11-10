@@ -37,7 +37,12 @@ interface ExamInterfaceProps {
 
 export const ExamInterface = ({ examId, onSubmitExam, onExitExam }: ExamInterfaceProps) => {
   const { toast } = useToast();
+  console.log('ExamInterface mounted with examId:', examId);
+  
   const { data: examData, isLoading, error: examError } = useExamWithQuestions(examId);
+  
+  console.log('ExamInterface state:', { examData, isLoading, examError });
+  
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [timeLeft, setTimeLeft] = useState(0);
@@ -47,12 +52,14 @@ export const ExamInterface = ({ examId, onSubmitExam, onExitExam }: ExamInterfac
   // Initialize timer when exam data loads
   useEffect(() => {
     if (examData && examData.is_timed) {
+      console.log('Setting timer for', examData.duration, 'minutes');
       setTimeLeft(examData.duration * 60); // Convert minutes to seconds
     }
   }, [examData]);
 
   // Show loading state
   if (isLoading) {
+    console.log('Showing loading state');
     return <LoadingState />;
   }
 
@@ -69,13 +76,17 @@ export const ExamInterface = ({ examId, onSubmitExam, onExitExam }: ExamInterfac
 
   // Check if exam data exists
   if (!examData) {
+    console.error('No exam data received');
     return <ErrorState message="Exam not found. Please contact your teacher." onBack={onExitExam} />;
   }
 
   // Check if exam has questions
   if (!examData.questions || examData.questions.length === 0) {
+    console.error('Exam has no questions:', examData);
     return <ErrorState message="This exam has no questions yet. Please contact your teacher." onBack={onExitExam} />;
   }
+  
+  console.log('Rendering exam interface with', examData.questions.length, 'questions');
 
   // Check if exam is scheduled and not yet available
   if (examData.start_time && new Date(examData.start_time) > new Date()) {
