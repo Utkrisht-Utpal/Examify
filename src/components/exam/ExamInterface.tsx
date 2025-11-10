@@ -110,13 +110,11 @@ export const ExamInterface = ({ examId, onSubmitExam, onExitExam }: ExamInterfac
 
   // Timer effect - only for timed exams
   useEffect(() => {
-    if (!examData?.is_timed || timeLeft === 0) return;
+    if (!examData?.is_timed || timeLeft <= 0) return;
 
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
-          // Auto-submit when time runs out
-          setIsSubmitting(true);
           return 0;
         }
         return prev - 1;
@@ -124,14 +122,17 @@ export const ExamInterface = ({ examId, onSubmitExam, onExitExam }: ExamInterfac
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [examData?.is_timed, timeLeft]);
+  }, [examData?.is_timed]); // Only depend on is_timed, not timeLeft
 
   // Auto-submit effect when time runs out
   useEffect(() => {
     if (timeLeft === 0 && examData?.is_timed && !isSubmitting) {
-      handleSubmit();
+      const timer = setTimeout(() => {
+        handleSubmit();
+      }, 100);
+      return () => clearTimeout(timer);
     }
-  }, [timeLeft, examData?.is_timed, isSubmitting]);
+  }, [timeLeft, examData?.is_timed]);
 
   const formatTime = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
