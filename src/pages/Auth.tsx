@@ -21,9 +21,10 @@ const Auth = ({ signIn, signUp }: AuthProps) => {
         description: `Welcome back!`,
       });
     } catch (error: any) {
+      console.error('Login error details:', error);
       toast({
         title: "Login Failed",
-        description: error.message,
+        description: error.message || "Invalid email or password. Please check your credentials and try again.",
         variant: "destructive",
       });
     }
