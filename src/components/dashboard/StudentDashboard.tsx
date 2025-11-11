@@ -44,7 +44,7 @@ export const StudentDashboard = ({ user, onStartExam, onViewResults }: StudentDa
       }
     };
     fetchUserData();
-  }, []);
+  }, []); // Runs on mount
   
   const { results, isLoading: resultsLoading } = useResults(userId || undefined);
 

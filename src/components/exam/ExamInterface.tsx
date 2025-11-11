@@ -46,6 +46,7 @@ export const ExamInterface = ({ examId, onSubmitExam, onExitExam }: ExamInterfac
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [timeLeft, setTimeLeft] = useState(0);
+  const [timerInitialized, setTimerInitialized] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [startTime] = useState(Date.now());
   const [hasExistingSubmission, setHasExistingSubmission] = useState(false);
@@ -179,6 +180,7 @@ export const ExamInterface = ({ examId, onSubmitExam, onExitExam }: ExamInterfac
     if (examData && examData.is_timed) {
       console.log('Setting timer for', examData.duration, 'minutes');
       setTimeLeft(examData.duration * 60);
+      setTimerInitialized(true);
     }
   }, [examData]);
 
@@ -200,11 +202,11 @@ export const ExamInterface = ({ examId, onSubmitExam, onExitExam }: ExamInterfac
 
   // Auto-submit effect when time runs out
   useEffect(() => {
-    if (timeLeft === 0 && examData?.is_timed && !isSubmitting) {
+    if (timeLeft === 0 && examData?.is_timed && timerInitialized && !isSubmitting) {
       console.log('Time expired, auto-submitting exam');
       setTimeout(() => handleSubmit(), 0);
     }
-  }, [timeLeft, examData?.is_timed, isSubmitting, handleSubmit]);
+  }, [timeLeft, examData?.is_timed, timerInitialized, isSubmitting, handleSubmit]);
 
   // Show loading state
   if (isLoading) {
