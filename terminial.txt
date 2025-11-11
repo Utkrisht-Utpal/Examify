@@ -1,0 +1,144 @@
+PS P:\Examify> cd Examify
+PS P:\Examify\Examify> npm i @vercel/analytics
+⠙
+
+
+
+
+PS P:\Examify> cd Examify
+PS P:\Examify\Examify> npm i @vercel/analytics
+⠹
+
+
+
+PS P:\Examify> cd Examify
+PS P:\Examify\Examify> npm i @vercel/analytics
+⠸
+
+PS P:\Examify> cd Examify
+PS P:\Examify\Examify> npm i @vercel/analytics
+PS P:\Examify> cd Examify
+PS P:\Examify> cd Examify
+PS P:\Examify\Examify> npm i @vercel/analytics
+
+added 393 packages, and audited 394 packages in 52s
+
+78 packages are looking for funding
+  run `npm fund` for details
+
+2 moderate severity vulnerabilities
+
+To address all issues, run:
+  npm audit fix
+Run `npm audit` for details.
+PS P:\Examify\Examify> npm audit fix
+
+changed 1 package, and audited 394 packages in 7s
+
+78 packages are looking for funding
+  run `npm fund` for details
+
+# npm audit report
+
+esbuild  <=0.24.2
+Severity: moderate
+esbuild enables any website to send any requests to the development server and read the response - https://github.com/advisories/GHSA-67mh-4wv8-2f99
+fix available via `npm audit fix --force`
+Will install vite@7.2.2, which is a breaking change
+node_modules/esbuild
+  vite  0.11.0 - 6.1.6
+  Depends on vulnerable versions of esbuild
+  node_modules/vite
+    lovable-tagger  <=1.1.9
+    Depends on vulnerable versions of vite
+
+3 moderate severity vulnerabilities
+
+To address issues that do not require attention, run:
+  npm audit fix
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+PS P:\Examify\Examify> npm audit fix --force
+npm warn using --force Recommended protections disabled.
+npm warn audit Updating vite to 7.2.2, which is a SemVer major change.
+
+added 6 packages, removed 2 packages, changed 7 packages, and audited 398 packages in 7s
+
+80 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+PS P:\Examify\Examify> npm run  
+Scripts available in vite_react_shadcn_ts@0.0.0 via `npm run-script`:
+  dev
+    vite
+  build
+    vite build
+  build:dev
+    vite build --mode development
+  lint
+    eslint .
+  preview
+    vite preview
+PS P:\Examify\Examify> npm preview
+Unknown command: "preview"
+
+
+Did you mean this?
+  npm run preview # run the "preview" package script
+To see a list of supported npm commands, run:
+  npm help
+PS P:\Examify\Examify> npm run preview 
+
+> vite_react_shadcn_ts@0.0.0 preview
+> vite preview
+
+error when starting preview server:
+Error: The directory "dist" does not exist. Did you build your project?
+    at preview (file:///P:/Examify/Examify/node_modules/vite/dist/node/chunks/config.js:35687:200)
+    at async CAC.<anonymous> (file:///P:/Examify/Examify/node_modules/vite/dist/node/cli.js:669:18)
+PS P:\Examify\Examify> npm build
+Unknown command: "build"
+
+
+Did you mean this?
+  npm run build # run the "build" package script
+To see a list of supported npm commands, run:
+  npm help
+PS P:\Examify\Examify> npm run build
+
+> vite_react_shadcn_ts@0.0.0 build
+> vite build
+
+vite v7.2.2 building client environment for production...
+✓ 2656 modules transformed.
+dist/index.html                   1.17 kB │ gzip:   0.56 kB
+dist/assets/index-ClOybvR9.css   61.30 kB │ gzip:  10.87 kB
+dist/assets/index-Duv5R5ee.js   678.10 kB │ gzip: 201.66 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 9.19s
+PS P:\Examify\Examify> npm run
+Scripts available in vite_react_shadcn_ts@0.0.0 via `npm run-script`:
+  dev
+    vite
+  build
+    vite build
+  build:dev
+    vite build --mode development
+  lint
+    eslint .
+  preview
+    vite preview
+PS P:\Examify\Examify> npm run preview
+
+> vite_react_shadcn_ts@0.0.0 preview
+> vite preview
+
+  ➜  Local:   http://localhost:4173/
+  ➜  Network: http://10.143.18.154:4173/
+  ➜  press h + enter to show help
