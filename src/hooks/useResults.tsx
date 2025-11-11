@@ -21,7 +21,8 @@ export const useResults = (userId?: string, examId?: string) => {
       const { data, error } = await query;
       if (error) throw error;
       return data;
-    }
+    },
+    enabled: !!userId || !!examId // Only run when we have userId or examId
   });
 
   return { results, isLoading };

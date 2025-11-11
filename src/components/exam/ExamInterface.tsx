@@ -81,6 +81,22 @@ export const ExamInterface = ({ examId, onSubmitExam, onExitExam }: ExamInterfac
   // Memoized submit handler
   const handleSubmit = useCallback(async () => {
     if (isSubmitting) return;
+    
+    console.log('=== EXAM SUBMISSION START ===');
+    console.log('Current answers state:', answers);
+    console.log('Number of answers:', Object.keys(answers).length);
+    console.log('Answers keys:', Object.keys(answers));
+    
+    // Validate that we have at least one answer
+    if (Object.keys(answers).length === 0) {
+      toast({
+        title: "No Answers Provided",
+        description: "Please answer at least one question before submitting.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     setIsSubmitting(true);
     const timeSpent = Math.floor((Date.now() - startTime) / 1000);
     
@@ -122,6 +138,9 @@ export const ExamInterface = ({ examId, onSubmitExam, onExitExam }: ExamInterfac
       };
 
       // Save submission
+      console.log('Saving submission with answers:', answers);
+      console.log('Answers JSON:', JSON.stringify(answers));
+      
       const { data: submission, error: submissionError } = await supabase
         .from('submissions')
         .insert({
@@ -138,7 +157,8 @@ export const ExamInterface = ({ examId, onSubmitExam, onExitExam }: ExamInterfac
         throw submissionError;
       }
       
-      console.log('Submission created:', submission);
+      console.log('Submission created successfully:', submission);
+      console.log('Submission answers field:', submission.answers);
       
       // Save results
       const { data: resultData, error: resultError } = await supabase
@@ -161,9 +181,17 @@ export const ExamInterface = ({ examId, onSubmitExam, onExitExam }: ExamInterfac
       
       console.log('Result created:', resultData);
 
-      // Invalidate queries to refresh dashboard data
-      await queryClient.invalidateQueries({ queryKey: ['results'] });
-      await queryClient.invalidateQueries({ queryKey: ['submissions'] });
+      // Invalidate queries with exact keys to refresh dashboard data
+      console.log('Invalidating queries for userId:', user.id);
+      await queryClient.invalidateQueries({ queryKey: ['results', user.id] });
+      await queryClient.invalidateQueries({ queryKey: ['submissions', examId] });
+      await queryClient.invalidateQueries({ queryKey: ['submittedExams', user.id] });
+      
+      // Force refetch to ensure fresh data
+      await queryClient.refetchQueries({ queryKey: ['results', user.id] });
+      await queryClient.refetchQueries({ queryKey: ['submittedExams', user.id] });
+      
+      console.log('=== EXAM SUBMISSION COMPLETE ===');
 
       toast({
         title: "Exam Submitted Successfully!",
@@ -283,10 +311,16 @@ export const ExamInterface = ({ examId, onSubmitExam, onExitExam }: ExamInterfac
   };
 
   const handleAnswerChange = (questionId: string, answer: string) => {
-    setAnswers(prev => ({
-      ...prev,
-      [questionId]: answer
-    }));
+    console.log('Answer changed for question:', questionId, 'Value:', answer);
+    setAnswers(prev => {
+      const updated = {
+        ...prev,
+        [questionId]: answer
+      };
+      console.log('Updated answers state:', updated);
+      console.log('Total answers:', Object.keys(updated).length);
+      return updated;
+    });
   };
 
   const getTimeColor = () => {
@@ -377,6 +411,9 @@ export const ExamInterface = ({ examId, onSubmitExam, onExitExam }: ExamInterfac
               <Progress value={progress} className="mb-2" />
               <p className="text-sm text-muted-foreground">
                 {answeredCount}/{examData.questions.length} completed
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Debug: {Object.keys(answers).length} answers saved
               </p>
             </div>
 

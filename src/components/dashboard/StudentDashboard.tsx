@@ -6,6 +6,7 @@ import { Progress } from "@/components/ui/progress";
 import { Calendar, Clock, BookOpen, Trophy, TrendingUp, FileText } from "lucide-react";
 import { useExams } from "@/hooks/useExams";
 import { useResults } from "@/hooks/useResults";
+import { useSubmittedExams } from "@/hooks/useSubmittedExams";
 import { supabase } from "@/integrations/supabase/client";
 
 interface StudentDashboardProps {
@@ -23,31 +24,24 @@ export const StudentDashboard = ({ user, onStartExam, onViewResults }: StudentDa
   
   // Get current user ID from Supabase
   const [userId, setUserId] = React.useState<string | null>(null);
-  const [submittedExamIds, setSubmittedExamIds] = React.useState<Set<string>>(new Set());
   
   React.useEffect(() => {
     const fetchUserData = async () => {
       const { data } = await supabase.auth.getUser();
       const uid = data.user?.id || null;
       setUserId(uid);
-      
-      // Fetch all submitted exam IDs for this user
-      if (uid) {
-        const { data: submissions } = await supabase
-          .from('submissions')
-          .select('exam_id')
-          .eq('student_id', uid);
-        
-        if (submissions) {
-          setSubmittedExamIds(new Set(submissions.map(s => s.exam_id)));
-        }
-      }
+      console.log('StudentDashboard - User ID:', uid);
     };
     fetchUserData();
-    // Refetch whenever component mounts to ensure fresh data
   }, []);
   
+  // Use React Query for results and submitted exams
   const { results, isLoading: resultsLoading } = useResults(userId || undefined);
+  const { submittedExamIds, isLoading: submittedLoading } = useSubmittedExams(userId || undefined);
+  
+  console.log('StudentDashboard - Results:', results);
+  console.log('StudentDashboard - Submitted Exam IDs:', submittedExamIds);
+  console.log('StudentDashboard - Completed count:', results?.length || 0);
 
   // Filter out exams that have already been submitted
   const availableExams = exams?.filter(exam => 
