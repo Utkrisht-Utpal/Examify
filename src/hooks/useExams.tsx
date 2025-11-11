@@ -171,7 +171,15 @@ export const useExamWithQuestions = (examId: string) => {
         }
         
         const isStudent = userRoles?.some(r => r.role === 'student');
+        const isTeacher = userRoles?.some(r => r.role === 'teacher');
+        const isOwner = exam.created_by === user.id;
         console.log('Is student:', isStudent);
+        console.log('Is teacher:', isTeacher);
+        console.log('Is owner:', isOwner);
+        
+        // If user is the owner or a teacher, keep all questions with answers
+        // Only sanitize for students
+        const shouldSanitize = isStudent && !isOwner && !isTeacher;
         
         // Map questions back in the correct order and sanitize for students
         const orderedQuestions = examQuestions
@@ -182,8 +190,8 @@ export const useExamWithQuestions = (examId: string) => {
               return null;
             }
             
-            // Remove correct_answer for students to prevent cheating
-            if (isStudent) {
+            // Remove correct_answer for students (but not for teachers/owners)
+            if (shouldSanitize) {
               const { correct_answer, ...sanitizedQuestion } = question;
               return sanitizedQuestion;
             }

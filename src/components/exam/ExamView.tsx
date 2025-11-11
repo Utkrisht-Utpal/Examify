@@ -37,10 +37,15 @@ interface ResultRecord {
 }
 
 export const ExamView = ({ examId, onBack, onEdit, onViewResults }: ExamViewProps) => {
-  const { data: examData, isLoading } = useExamWithQuestions(examId);
+  const { data: examData, isLoading, error } = useExamWithQuestions(examId);
   const { submissions } = useSubmissions();
   const [averageScore, setAverageScore] = useState(0);
   const [submissionResults, setSubmissionResults] = useState<Record<string, ResultRecord>>({});
+  
+  console.log('ExamView - examId:', examId);
+  console.log('ExamView - isLoading:', isLoading);
+  console.log('ExamView - error:', error);
+  console.log('ExamView - examData:', examData);
 
   // Fetch average score and submission results - must be before conditional returns
   useEffect(() => {
@@ -68,6 +73,18 @@ export const ExamView = ({ examId, onBack, onEdit, onViewResults }: ExamViewProp
 
   if (isLoading) {
     return <LoadingState />;
+  }
+
+  if (error) {
+    return (
+      <div className="p-6">
+        <Button onClick={onBack}>← Back</Button>
+        <div className="mt-4 p-4 bg-destructive/10 border border-destructive rounded-lg">
+          <p className="text-destructive font-semibold">Error loading exam</p>
+          <p className="text-sm text-muted-foreground mt-2">{error instanceof Error ? error.message : 'Unknown error'}</p>
+        </div>
+      </div>
+    );
   }
 
   if (!examData) {
