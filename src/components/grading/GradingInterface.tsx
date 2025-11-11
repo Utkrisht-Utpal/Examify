@@ -48,14 +48,17 @@ export const GradingInterface = ({ submissionId, onBack }: GradingInterfaceProps
         const initialGrades: Record<string, number> = {};
         let autoScore = 0;
         
-        data.questions.forEach((eq: any) => {
-          const question = eq.questions;
-          const userAnswer = data.submission.answers[question.id] || '';
-          const isCorrect = userAnswer.toLowerCase().trim() === question.correct_answer.toLowerCase().trim();
-          const points = isCorrect ? question.points : 0;
-          initialGrades[question.id] = points;
-          autoScore += points;
-        });
+        if (data?.questions && Array.isArray(data.questions)) {
+          data.questions.forEach((eq: any) => {
+            const question = eq.questions;
+            if (!question) return;
+            const userAnswer = data.submission.answers[question.id] || '';
+            const isCorrect = userAnswer.toLowerCase().trim() === question.correct_answer.toLowerCase().trim();
+            const points = isCorrect ? question.points : 0;
+            initialGrades[question.id] = points;
+            autoScore += points;
+          });
+        }
         
         setQuestionGrades(initialGrades);
         setTotalScore(autoScore);

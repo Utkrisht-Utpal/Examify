@@ -43,7 +43,7 @@ export const useGrading = (examId?: string) => {
 
   // Fetch submission details with questions
   const fetchSubmissionDetails = async (submissionId: string) => {
-    const { data: submission } = await supabase
+    const { data: submission, error } = await supabase
       .from('submissions')
       .select(`
         *,
@@ -51,8 +51,9 @@ export const useGrading = (examId?: string) => {
         profiles!inner(full_name, email)
       `)
       .eq('id', submissionId)
-      .single();
+      .maybeSingle();
 
+    if (error) throw error;
     if (!submission) throw new Error('Submission not found');
 
     // Fetch exam questions

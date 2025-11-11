@@ -125,15 +125,20 @@ export const ExamInterface = ({ examId, onSubmitExam, onExitExam }: ExamInterfac
           exam_id: examId,
           student_id: user.id,
           answers: answers,
-          time_taken: timeSpent
+          time_taken: Math.floor(timeSpent / 60) // Convert seconds to minutes
         })
         .select()
         .single();
 
-      if (submissionError) throw submissionError;
+      if (submissionError) {
+        console.error('Submission error:', submissionError);
+        throw submissionError;
+      }
+      
+      console.log('Submission created:', submission);
       
       // Save results
-      const { error: resultError } = await supabase
+      const { data: resultData, error: resultError } = await supabase
         .from('results')
         .insert({
           submission_id: submission.id,
@@ -142,9 +147,16 @@ export const ExamInterface = ({ examId, onSubmitExam, onExitExam }: ExamInterfac
           score: results.totalScore,
           total_marks: results.maxScore,
           percentage: results.percentage
-        });
+        })
+        .select()
+        .single();
 
-      if (resultError) throw resultError;
+      if (resultError) {
+        console.error('Result error:', resultError);
+        throw resultError;
+      }
+      
+      console.log('Result created:', resultData);
 
       toast({
         title: "Exam Submitted Successfully!",

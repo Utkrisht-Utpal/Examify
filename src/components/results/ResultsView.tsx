@@ -78,7 +78,7 @@ export const ResultsView = ({ user, onBack }: ResultsViewProps) => {
               .from('submissions')
               .select('answers, time_taken')
               .eq('id', result.submission_id)
-              .single();
+              .maybeSingle();
 
             // Fetch exam questions
             const { data: examQuestions } = await supabase
