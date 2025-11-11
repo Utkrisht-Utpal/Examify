@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { format } from "date-fns";
+import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -37,6 +38,7 @@ interface ExamInterfaceProps {
 
 export const ExamInterface = ({ examId, onSubmitExam, onExitExam }: ExamInterfaceProps) => {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   console.log('ExamInterface mounted with examId:', examId);
   
   const { data: examData, isLoading, error: examError } = useExamWithQuestions(examId);
@@ -158,6 +160,10 @@ export const ExamInterface = ({ examId, onSubmitExam, onExitExam }: ExamInterfac
       }
       
       console.log('Result created:', resultData);
+
+      // Invalidate queries to refresh dashboard data
+      await queryClient.invalidateQueries({ queryKey: ['results'] });
+      await queryClient.invalidateQueries({ queryKey: ['submissions'] });
 
       toast({
         title: "Exam Submitted Successfully!",

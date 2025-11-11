@@ -183,6 +183,7 @@ const Index = () => {
       <main>
         {user.role === "student" && (
           <StudentDashboard
+            key={currentView} 
             user={user}
             onStartExam={handleStartExam}
             onViewResults={handleViewResults}
