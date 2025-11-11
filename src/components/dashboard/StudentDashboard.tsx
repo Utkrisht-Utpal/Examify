@@ -23,13 +23,35 @@ export const StudentDashboard = ({ user, onStartExam, onViewResults }: StudentDa
   
   // Get current user ID from Supabase
   const [userId, setUserId] = React.useState<string | null>(null);
+  const [submittedExamIds, setSubmittedExamIds] = React.useState<Set<string>>(new Set());
+  
   React.useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id || null));
+    const fetchUserData = async () => {
+      const { data } = await supabase.auth.getUser();
+      const uid = data.user?.id || null;
+      setUserId(uid);
+      
+      // Fetch all submitted exam IDs for this user
+      if (uid) {
+        const { data: submissions } = await supabase
+          .from('submissions')
+          .select('exam_id')
+          .eq('student_id', uid);
+        
+        if (submissions) {
+          setSubmittedExamIds(new Set(submissions.map(s => s.exam_id)));
+        }
+      }
+    };
+    fetchUserData();
   }, []);
   
   const { results, isLoading: resultsLoading } = useResults(userId || undefined);
 
-  const availableExams = exams?.filter(exam => exam.status === 'published') || [];
+  // Filter out exams that have already been submitted
+  const availableExams = exams?.filter(exam => 
+    exam.status === 'published' && !submittedExamIds.has(exam.id)
+  ) || [];
   
   // Helper function to get exam availability status
   const getExamStatus = (exam: any) => {
@@ -199,9 +221,15 @@ export const StudentDashboard = ({ user, onStartExam, onViewResults }: StudentDa
                     <div>
                       <Button 
                         onClick={() => onStartExam(exam.id)}
-                        disabled={!examStatus.canStart}
+                        disabled={!examStatus.canStart || submittedExamIds.has(exam.id)}
                       >
-                        {examStatus.status === 'upcoming' ? 'Not Yet Available' : examStatus.status === 'ended' ? 'Exam Ended' : 'Start Exam'}
+                        {submittedExamIds.has(exam.id) 
+                          ? 'Already Submitted' 
+                          : examStatus.status === 'upcoming' 
+                          ? 'Not Yet Available' 
+                          : examStatus.status === 'ended' 
+                          ? 'Exam Ended' 
+                          : 'Start Exam'}
                       </Button>
                     </div>
                   </div>
