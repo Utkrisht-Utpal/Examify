@@ -249,11 +249,12 @@ export const ExamCreator = ({ onBack }: ExamCreatorProps) => {
 
       // Go back to dashboard after successful save
       setTimeout(() => onBack(), 1500);
-    } catch (error: any) {
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to save exam. Please try again.";
       console.error('Exam creation error:', error);
       toast({
         title: "Error Creating Exam",
-        description: error.message || "Failed to save exam. Please try again.",
+        description: errorMessage,
         variant: "destructive"
       });
     }

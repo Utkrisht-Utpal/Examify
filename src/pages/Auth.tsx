@@ -20,11 +20,12 @@ const Auth = ({ signIn, signUp }: AuthProps) => {
         title: "Login Successful",
         description: `Welcome back!`,
       });
-    } catch (error: any) {
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Invalid email or password. Please check your credentials and try again.";
       console.error('Login error details:', error);
       toast({
         title: "Login Failed",
-        description: error.message || "Invalid email or password. Please check your credentials and try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     }
@@ -47,10 +48,11 @@ const Auth = ({ signIn, signUp }: AuthProps) => {
         title: "Registration Successful",
         description: `Welcome, ${name}! You can now sign in.`,
       });
-    } catch (error: any) {
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Registration failed";
       toast({
         title: "Registration Failed",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
     }

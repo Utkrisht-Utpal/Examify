@@ -25,7 +25,7 @@ export const useQuestions = (subject?: string) => {
   });
 
   const createQuestion = useMutation({
-    mutationFn: async (questionData: any) => {
+    mutationFn: async (questionData: Record<string, unknown>) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 

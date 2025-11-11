@@ -72,7 +72,7 @@ export const ResultsView = ({ user, onBack }: ResultsViewProps) => {
 
       try {
         const detailedData = await Promise.all(
-          results.map(async (result: any) => {
+          results.map(async (result) => {
             // Fetch submission details with answers
             const { data: submission } = await supabase
               .from('submissions')
@@ -101,7 +101,7 @@ export const ResultsView = ({ user, onBack }: ResultsViewProps) => {
             let correctAnswers = 0;
             let incorrectAnswers = 0;
             
-            const questionAnalysis = examQuestions?.map((eq: any) => {
+            const questionAnalysis = examQuestions?.map((eq) => {
               const question = eq.questions;
               const userAnswer = answers[question.id] || '';
               const isCorrect = userAnswer.toLowerCase().trim() === question.correct_answer.toLowerCase().trim();

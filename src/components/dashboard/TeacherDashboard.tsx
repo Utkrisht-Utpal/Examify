@@ -284,7 +284,7 @@ export const TeacherDashboard = ({ user, onCreateExam, onViewResults, onViewExam
                 <p className="text-center text-muted-foreground py-4">No submissions pending grading</p>
               ) : (
                 <div className="space-y-4">
-                  {pendingSubmissions.map((submission: any) => {
+                  {pendingSubmissions.map((submission) => {
                     const hasResult = submission.results && submission.results.length > 0;
                     const isGraded = hasResult && submission.results[0].graded_at;
                     

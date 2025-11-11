@@ -34,7 +34,7 @@ export const useGrading = (examId?: string) => {
 
       // Filter to show only ungraded submissions or those created by current teacher
       const { data: { user } } = await supabase.auth.getUser();
-      return data?.filter((sub: any) => 
+      return data?.filter((sub) =>
         sub.exams.created_by === user?.id
       ) || [];
     },
@@ -151,10 +151,11 @@ export const useGrading = (examId?: string) => {
         description: 'Submission graded successfully'
       });
     },
-    onError: (error: any) => {
+    onError: (error) => {
+      const errorMessage = error instanceof Error ? error.message : 'An error occurred';
       toast({
         title: 'Error',
-        description: error.message,
+        description: errorMessage,
         variant: 'destructive'
       });
     }

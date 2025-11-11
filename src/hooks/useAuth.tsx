@@ -87,7 +87,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     if (data.user) {
       const { error: roleError } = await supabase
         .from('user_roles')
-        .insert({ user_id: data.user.id, role: role as any });
+        .insert({ user_id: data.user.id, role });
       
       if (roleError) throw roleError;
     }
@@ -120,6 +120,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {

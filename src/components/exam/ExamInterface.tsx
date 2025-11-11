@@ -109,7 +109,7 @@ export const ExamInterface = ({ examId, onSubmitExam, onExitExam }: ExamInterfac
       let correctAnswers = 0;
       const maxScore = examData?.total_marks || 0;
 
-      examData?.questions?.forEach((question: any) => {
+      examData?.questions?.forEach((question) => {
         const userAnswer = answers[question.id];
         if (!userAnswer) return;
 
@@ -199,15 +199,16 @@ export const ExamInterface = ({ examId, onSubmitExam, onExitExam }: ExamInterfac
       });
 
       onSubmitExam(results);
-    } catch (error: any) {
+  } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to submit exam";
       toast({
         title: "Submission Error",
-        description: error.message || "Failed to submit exam",
+        description: errorMessage,
         variant: "destructive"
       });
       setIsSubmitting(false);
     }
-  }, [examData, answers, examId, startTime, isSubmitting, toast, onSubmitExam]);
+  }, [examData, answers, examId, startTime, isSubmitting, toast, onSubmitExam, queryClient]);
 
   // Initialize timer when exam data loads
   useEffect(() => {
@@ -232,7 +233,7 @@ export const ExamInterface = ({ examId, onSubmitExam, onExitExam }: ExamInterfac
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [examData?.is_timed]);
+  }, [examData?.is_timed, timeLeft]);
 
   // Auto-submit effect when time runs out
   useEffect(() => {
@@ -420,7 +421,7 @@ export const ExamInterface = ({ examId, onSubmitExam, onExitExam }: ExamInterfac
             <div>
               <h3 className="font-semibold mb-2">Questions</h3>
               <div className="grid grid-cols-5 gap-2">
-                {examData.questions.map((_: any, index: number) => {
+                {examData.questions.map((_, index: number) => {
                   const status = getQuestionStatus(index);
                   return (
                     <button

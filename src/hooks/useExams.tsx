@@ -20,7 +20,7 @@ export const useExams = () => {
   });
 
   const createExam = useMutation({
-    mutationFn: async (examData: any) => {
+    mutationFn: async (examData: Record<string, unknown>) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
@@ -60,10 +60,11 @@ export const useExams = () => {
         description: `Exam ${data.status === 'published' ? 'published' : 'updated'} successfully`
       });
     },
-    onError: (error: any) => {
+    onError: (error) => {
+      const errorMessage = error instanceof Error ? error.message : 'An error occurred';
       toast({
         title: 'Error',
-        description: error.message,
+        description: errorMessage,
         variant: 'destructive'
       });
     }

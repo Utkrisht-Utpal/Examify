@@ -33,7 +33,19 @@ interface QuestionGrade {
 export const GradingInterface = ({ submissionId, onBack }: GradingInterfaceProps) => {
   const { fetchSubmissionDetails, gradeSubmission } = useGrading();
   const [isLoading, setIsLoading] = useState(true);
-  const [submissionData, setSubmissionData] = useState<any>(null);
+  const [submissionData, setSubmissionData] = useState<{
+    submission: {
+      id: string;
+      exam_id: string;
+      student_id: string;
+      submitted_at: string;
+      time_taken: number;
+      answers: Record<string, string>;
+      exams: { id: string; title: string; total_marks: number };
+      profiles: { full_name: string };
+    };
+    questions: Array<{ questions: Record<string, unknown> }>;
+  } | null>(null);
   const [questionGrades, setQuestionGrades] = useState<Record<string, number>>({});
   const [feedback, setFeedback] = useState("");
   const [totalScore, setTotalScore] = useState(0);
@@ -49,7 +61,7 @@ export const GradingInterface = ({ submissionId, onBack }: GradingInterfaceProps
         let autoScore = 0;
         
         if (data?.questions && Array.isArray(data.questions)) {
-          data.questions.forEach((eq: any) => {
+          data.questions.forEach((eq) => {
             const question = eq.questions;
             if (!question) return;
             const userAnswer = data.submission.answers[question.id] || '';
@@ -70,7 +82,7 @@ export const GradingInterface = ({ submissionId, onBack }: GradingInterfaceProps
     };
 
     loadSubmission();
-  }, [submissionId]);
+  }, [submissionId, fetchSubmissionDetails]);
 
   const handleGradeChange = (questionId: string, points: number, maxPoints: number) => {
     const validPoints = Math.max(0, Math.min(points, maxPoints));
@@ -217,7 +229,7 @@ export const GradingInterface = ({ submissionId, onBack }: GradingInterfaceProps
         </CardHeader>
         <CardContent>
           <div className="space-y-6">
-            {questions.map((eq: any, index: number) => {
+            {questions.map((eq, index: number) => {
               const question = eq.questions;
               const userAnswer = submission.answers[question.id] || '';
               const isCorrect = userAnswer.toLowerCase().trim() === question.correct_answer.toLowerCase().trim();

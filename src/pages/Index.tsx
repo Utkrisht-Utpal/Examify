@@ -20,10 +20,20 @@ interface User {
 
 const Index = () => {
   const { user: authUser, signOut, signIn, signUp, loading, roles } = useAuth();
-  const [currentView, setCurrentView] = useState<"dashboard" | "exam" | "results" | "create-exam" | "view-exam" | "grading">("dashboard");
+  type ViewType = "dashboard" | "exam" | "results" | "create-exam" | "view-exam" | "grading";
+  interface ExamResults {
+    totalScore: number;
+    maxScore: number;
+    correctAnswers: number;
+    incorrectAnswers: number;
+    percentage: number;
+    answers: Record<string, string>;
+  }
+  
+  const [currentView, setCurrentView] = useState<ViewType>("dashboard");
   const [currentExamId, setCurrentExamId] = useState<string | null>(null);
   const [currentSubmissionId, setCurrentSubmissionId] = useState<string | null>(null);
-  const [examResults, setExamResults] = useState<any>(null);
+  const [examResults, setExamResults] = useState<ExamResults | null>(null);
   const { toast } = useToast();
 
   const handleLogout = async () => {
@@ -45,7 +55,7 @@ const Index = () => {
     });
   };
 
-  const handleSubmitExam = (results: any) => {
+  const handleSubmitExam = (results: ExamResults) => {
     console.log("Exam submitted with results:", results);
     setExamResults(results);
     setCurrentView("results");

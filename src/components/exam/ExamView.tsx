@@ -1,4 +1,4 @@
-import React from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -7,7 +7,6 @@ import { Progress } from "@/components/ui/progress";
 import { 
   ArrowLeft, 
   Edit, 
-  Eye, 
   Play, 
   Pause, 
   Users, 
@@ -17,8 +16,7 @@ import {
   Download,
   Settings,
   Calendar,
-  CheckCircle,
-  XCircle
+  CheckCircle
 } from "lucide-react";
 import { useExamWithQuestions } from "@/hooks/useExams";
 import { useSubmissions } from "@/hooks/useSubmissions";
@@ -32,45 +30,41 @@ interface ExamViewProps {
   onViewResults: () => void;
 }
 
-interface ExamData {
-  id: string;
-  title: string;
-  subject: string;
-  duration: number;
-  totalQuestions: number;
-  totalPoints: number;
-  passingScore: number;
-  status: "draft" | "active" | "completed" | "paused";
-  createdDate: string;
-  startDate?: string;
-  endDate?: string;
-  instructions: string;
-  studentsEnrolled: number;
-  studentsCompleted: number;
-  averageScore: number;
-  questions: {
-    id: string;
-    type: "mcq" | "descriptive";
-    text: string;
-    options?: string[];
-    correctAnswer?: string;
-    points: number;
-  }[];
-  submissions: {
-    studentName: string;
-    score: number;
-    percentage: number;
-    submittedAt: string;
-    timeSpent: string;
-    status: "completed" | "in-progress";
-  }[];
+interface ResultRecord {
+  percentage: number;
+  submission_id: string;
+  score: number;
 }
 
 export const ExamView = ({ examId, onBack, onEdit, onViewResults }: ExamViewProps) => {
   const { data: examData, isLoading } = useExamWithQuestions(examId);
   const { submissions } = useSubmissions();
-  const [averageScore, setAverageScore] = React.useState(0);
-  const [submissionResults, setSubmissionResults] = React.useState<Record<string, any>>({});
+  const [averageScore, setAverageScore] = useState(0);
+  const [submissionResults, setSubmissionResults] = useState<Record<string, ResultRecord>>({});
+
+  // Fetch average score and submission results - must be before conditional returns
+  useEffect(() => {
+    const fetchData = async () => {
+      // Fetch average score
+      const { data: results } = await supabase
+        .from('results')
+        .select('percentage, submission_id, score')
+        .eq('exam_id', examId);
+      
+      if (results && results.length > 0) {
+        const avg = results.reduce((acc, r) => acc + r.percentage, 0) / results.length;
+        setAverageScore(avg);
+        
+        // Create a map of submission_id to result
+        const resultsMap: Record<string, ResultRecord> = {};
+        results.forEach((r: ResultRecord) => {
+          resultsMap[r.submission_id] = r;
+        });
+        setSubmissionResults(resultsMap);
+      }
+    };
+    fetchData();
+  }, [examId]);
 
   if (isLoading) {
     return <LoadingState />;
@@ -88,30 +82,6 @@ export const ExamView = ({ examId, onBack, onEdit, onViewResults }: ExamViewProp
   const examSubmissions = submissions?.filter(s => s.exam_id === examId) || [];
   const studentsCompleted = examSubmissions.length;
   const studentsEnrolled = studentsCompleted; // This should come from enrollment data
-  
-  // Fetch average score and submission results
-  React.useEffect(() => {
-    const fetchData = async () => {
-      // Fetch average score
-      const { data: results } = await supabase
-        .from('results')
-        .select('percentage, submission_id, score')
-        .eq('exam_id', examId);
-      
-      if (results && results.length > 0) {
-        const avg = results.reduce((acc, r) => acc + r.percentage, 0) / results.length;
-        setAverageScore(avg);
-        
-        // Create a map of submission_id to result
-        const resultsMap: Record<string, any> = {};
-        results.forEach(r => {
-          resultsMap[r.submission_id] = r;
-        });
-        setSubmissionResults(resultsMap);
-      }
-    };
-    fetchData();
-  }, [examId]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -307,7 +277,7 @@ export const ExamView = ({ examId, onBack, onEdit, onViewResults }: ExamViewProp
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {(examData.questions || []).filter((q: any) => q !== null).map((question: any, index: number) => (
+                {(examData.questions || []).filter((q) => q !== null).map((question, index: number) => (
                   <div key={question.id} className="border rounded-lg p-4">
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex items-center gap-2">
@@ -367,7 +337,7 @@ export const ExamView = ({ examId, onBack, onEdit, onViewResults }: ExamViewProp
                 {examSubmissions.length === 0 ? (
                   <p className="text-center text-muted-foreground py-4">No submissions yet</p>
                 ) : (
-                  examSubmissions.map((submission: any, index: number) => {
+                  examSubmissions.map((submission, index: number) => {
                     const result = submissionResults[submission.id];
                     return (
                       <div key={index} className="flex items-center justify-between p-4 border rounded-lg">

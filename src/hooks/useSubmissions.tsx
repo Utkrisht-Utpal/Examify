@@ -55,10 +55,11 @@ export const useSubmissions = (examId?: string) => {
         description: 'Exam submitted successfully'
       });
     },
-    onError: (error: any) => {
+    onError: (error) => {
+      const errorMessage = error instanceof Error ? error.message : 'An error occurred';
       toast({
         title: 'Error',
-        description: error.message,
+        description: errorMessage,
         variant: 'destructive'
       });
     }

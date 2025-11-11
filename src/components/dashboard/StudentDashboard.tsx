@@ -1,4 +1,4 @@
-import React from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -23,9 +23,9 @@ export const StudentDashboard = ({ user, onStartExam, onViewResults }: StudentDa
   const { exams, isLoading: examsLoading } = useExams();
   
   // Get current user ID from Supabase
-  const [userId, setUserId] = React.useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
   
-  React.useEffect(() => {
+  useEffect(() => {
     const fetchUserData = async () => {
       const { data } = await supabase.auth.getUser();
       const uid = data.user?.id || null;
@@ -49,7 +49,7 @@ export const StudentDashboard = ({ user, onStartExam, onViewResults }: StudentDa
   ) || [];
   
   // Helper function to get exam availability status
-  const getExamStatus = (exam: any) => {
+  const getExamStatus = (exam: { start_time?: string; end_time?: string; auto_close?: boolean }) => {
     const now = new Date();
     const startTime = exam.start_time ? new Date(exam.start_time) : null;
     const endTime = exam.end_time ? new Date(exam.end_time) : null;
