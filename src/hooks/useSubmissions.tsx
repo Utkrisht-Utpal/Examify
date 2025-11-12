@@ -9,20 +9,39 @@ export const useSubmissions = (examId?: string) => {
   const { data: submissions, isLoading } = useQuery({
     queryKey: ['submissions', examId],
     queryFn: async () => {
-      let query = supabase
-        .from('submissions')
-        .select('*, exams(title, subject), profiles(full_name)')
-        .order('submitted_at', { ascending: false });
-      
+      // If a specific examId is provided, just fetch its submissions
       if (examId) {
-        query = query.eq('exam_id', examId);
+        const { data, error } = await supabase
+          .from('submissions')
+          .select('*, exams(title, subject), profiles(full_name)')
+          .eq('exam_id', examId)
+          .order('submitted_at', { ascending: false });
+        if (error) throw error;
+        return data;
       }
 
-      const { data, error } = await query;
+      // Otherwise, fetch submissions only for exams created by the current teacher
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return [];
+
+      const { data: teacherExams, error: examsError } = await supabase
+        .from('exams')
+        .select('id')
+        .eq('created_by', user.id);
+      if (examsError) throw examsError;
+      if (!teacherExams || teacherExams.length === 0) return [];
+
+      const examIds = teacherExams.map(e => e.id);
+      const { data, error } = await supabase
+        .from('submissions')
+        .select('*, exams(title, subject), profiles(full_name)')
+        .in('exam_id', examIds)
+        .order('submitted_at', { ascending: false });
       if (error) throw error;
       return data;
     },
-    enabled: !!examId
+    // Always enabled so the teacher dashboard can load overall submissions
+    enabled: true,
   });
 
   const submitExam = useMutation({

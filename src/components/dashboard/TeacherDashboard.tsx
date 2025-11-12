@@ -74,6 +74,14 @@ export const TeacherDashboard = ({ user, onCreateExam, onViewResults, onViewExam
   }, []);
 
   const teacherExams = exams?.filter(exam => exam.created_by === userId) || [];
+  
+  // Group submissions by exam for quick counts
+  const submissionsByExam: Record<string, number> = (submissions || []).reduce((acc: Record<string, number>, s: any) => {
+    const key = s.exam_id;
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+  
   const recentActivity = submissions?.slice(0, 4).map(sub => ({
     type: "submission",
     student: sub.profiles?.full_name || 'Unknown',
@@ -232,6 +240,10 @@ export const TeacherDashboard = ({ user, onCreateExam, onViewResults, onViewExam
                           <div className="flex items-center gap-1">
                             <Calendar className="h-3 w-3" />
                             Created {new Date(exam.created_at).toLocaleDateString()}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <FileText className="h-3 w-3" />
+                            {submissionsByExam[exam.id] || 0} submissions
                           </div>
                         </div>
                         {(exam.start_time || exam.end_time) && (

@@ -7,38 +7,63 @@ export const useGrading = (examId?: string) => {
   const queryClient = useQueryClient();
 
   // Fetch submissions that need grading
-  const { data: pendingSubmissions, isLoading: isLoadingSubmissions } = useQuery({
+  const { data: pendingSubmissions, isLoading: isLoadingSubmissions, error: submissionsError } = useQuery({
     queryKey: ['pending-submissions', examId],
     queryFn: async () => {
-      let query = supabase
-        .from('submissions')
-        .select(`
-          id,
-          exam_id,
-          student_id,
-          answers,
-          time_taken,
-          submitted_at,
-          exams!inner(id, title, subject, total_marks, created_by),
-          profiles!inner(full_name),
-          results(id, score, graded_at, graded_by)
-        `)
-        .order('submitted_at', { ascending: false });
-      
-      if (examId) {
-        query = query.eq('exam_id', examId);
+      try {
+        console.log('=== FETCHING PENDING SUBMISSIONS ===');
+        
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('User not authenticated');
+        
+        console.log('Current user:', user.email);
+        
+        // Get all exams created by this teacher
+        const { data: teacherExams, error: examsError } = await supabase
+          .from('exams')
+          .select('id')
+          .eq('created_by', user.id);
+        
+        if (examsError) throw examsError;
+        if (!teacherExams || teacherExams.length === 0) {
+          console.log('No exams created by teacher');
+          return [];
+        }
+        
+        const examIds = teacherExams.map(e => e.id);
+        console.log('Teacher exam IDs:', examIds);
+        
+        let query = supabase
+          .from('submissions')
+          .select(`
+            id,
+            exam_id,
+            student_id,
+            answers,
+            time_taken,
+            submitted_at,
+            exams!inner(id, title, subject, total_marks, created_by),
+            profiles!inner(full_name),
+            results(id, score, graded_at, graded_by)
+          `)
+          .in('exam_id', examIds)
+          .order('submitted_at', { ascending: false });
+        
+        if (examId) {
+          query = query.eq('exam_id', examId);
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
+        
+        console.log('Fetched submissions:', data?.length);
+        return data || [];
+      } catch (error) {
+        console.error('Error fetching pending submissions:', error);
+        throw error;
       }
-
-      const { data, error } = await query;
-      if (error) throw error;
-
-      // Filter to show only ungraded submissions or those created by current teacher
-      const { data: { user } } = await supabase.auth.getUser();
-      return data?.filter((sub) =>
-        sub.exams.created_by === user?.id
-      ) || [];
     },
-    enabled: !!examId || true
+    enabled: true
   });
 
   // Fetch submission details with questions
@@ -164,6 +189,7 @@ export const useGrading = (examId?: string) => {
   return {
     pendingSubmissions,
     isLoadingSubmissions,
+    submissionsError,
     fetchSubmissionDetails,
     gradeSubmission
   };

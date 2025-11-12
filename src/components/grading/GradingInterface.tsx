@@ -24,36 +24,47 @@ interface GradingInterfaceProps {
   onBack: () => void;
 }
 
-interface QuestionGrade {
-  questionId: string;
+interface Question {
+  id: string;
+  question_text: string;
+  question_type: string;
+  options?: string[];
+  correct_answer: string;
   points: number;
-  maxPoints: number;
+}
+
+interface SubmissionData {
+  submission: {
+    id: string;
+    exam_id: string;
+    student_id: string;
+    submitted_at: string;
+    time_taken: number;
+    answers: Record<string, string>;
+    exams: { id: string; title: string; total_marks: number };
+    profiles: { full_name: string };
+  };
+  questions: Array<{ questions: Question }>;
 }
 
 export const GradingInterface = ({ submissionId, onBack }: GradingInterfaceProps) => {
   const { fetchSubmissionDetails, gradeSubmission } = useGrading();
   const [isLoading, setIsLoading] = useState(true);
-  const [submissionData, setSubmissionData] = useState<{
-    submission: {
-      id: string;
-      exam_id: string;
-      student_id: string;
-      submitted_at: string;
-      time_taken: number;
-      answers: Record<string, string>;
-      exams: { id: string; title: string; total_marks: number };
-      profiles: { full_name: string };
-    };
-    questions: Array<{ questions: Record<string, unknown> }>;
-  } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [submissionData, setSubmissionData] = useState<SubmissionData | null>(null);
   const [questionGrades, setQuestionGrades] = useState<Record<string, number>>({});
   const [feedback, setFeedback] = useState("");
   const [totalScore, setTotalScore] = useState(0);
+  
+  console.log('GradingInterface - submissionId:', submissionId);
 
   useEffect(() => {
     const loadSubmission = async () => {
       try {
+        console.log('Loading submission details for ID:', submissionId);
+        setError(null);
         const data = await fetchSubmissionDetails(submissionId);
+        console.log('Submission data loaded:', data);
         setSubmissionData(data);
         
         // Initialize grades based on correct/incorrect answers
@@ -62,20 +73,24 @@ export const GradingInterface = ({ submissionId, onBack }: GradingInterfaceProps
         
         if (data?.questions && Array.isArray(data.questions)) {
           data.questions.forEach((eq) => {
-            const question = eq.questions;
+            const question = eq.questions as Question;
             if (!question) return;
             const userAnswer = data.submission.answers[question.id] || '';
-            const isCorrect = userAnswer.toLowerCase().trim() === question.correct_answer.toLowerCase().trim();
+            const isCorrect = userAnswer.toLowerCase().trim() === question.correct_answer?.toLowerCase().trim();
             const points = isCorrect ? question.points : 0;
             initialGrades[question.id] = points;
             autoScore += points;
           });
         }
         
+        console.log('Initial grades:', initialGrades);
+        console.log('Auto score:', autoScore);
         setQuestionGrades(initialGrades);
         setTotalScore(autoScore);
-      } catch (error) {
-        console.error('Error loading submission:', error);
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'Failed to load submission';
+        console.error('Error loading submission:', err);
+        setError(errorMessage);
       } finally {
         setIsLoading(false);
       }
