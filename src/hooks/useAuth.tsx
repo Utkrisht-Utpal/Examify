@@ -96,43 +96,57 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        try {
-          setLoading(true);
-          setSession(session);
-          setUser(session?.user ?? null);
-          
-          if (session?.user) {
-            // Ensure profile row exists
-            await ensureProfile(session.user.id, session.user.email, (session.user.user_metadata as any)?.full_name);
-  
-            // Fetch user roles and compute effective role (prefer metadata)
-            let roleList: string[] = [];
+        // Always reflect latest session and user
+        setSession(session);
+        setUser(session?.user ?? null);
+
+        // Handle events with minimal UI disruption
+        switch (event) {
+          case 'SIGNED_IN': {
             try {
-              const { data: rolesData } = await supabase
-                .from('user_roles')
-                .select('role')
-                .eq('user_id', session.user.id);
-              roleList = (rolesData || []).map(r => r.role);
-              setRoles(roleList);
-            } catch {}
-            const metaRole = (session.user.user_metadata as any)?.role;
-            const derived = deriveRole(metaRole, roleList, session.user.email);
-            setEffectiveRole(prev => (prev === 'teacher' ? 'teacher' : derived));
-            await persistRoleToMetadataIfNeeded(metaRole, session.user.email, derived);
-            if (!roleList || roleList.length === 0) {
-              await tryEnsureUserRole(session.user.id, derived);
-              setRoles([derived]);
+              setLoading(true);
+              if (session?.user) {
+                await ensureProfile(session.user.id, session.user.email, (session.user.user_metadata as any)?.full_name);
+                // Fetch user roles only on sign-in
+                let roleList: string[] = [];
+                try {
+                  const { data: rolesData } = await supabase
+                    .from('user_roles')
+                    .select('role')
+                    .eq('user_id', session.user.id);
+                  roleList = (rolesData || []).map(r => r.role);
+                  setRoles(roleList);
+                } catch {}
+                const metaRole = (session.user.user_metadata as any)?.role;
+                const derived = deriveRole(metaRole, roleList, session.user.email);
+                setEffectiveRole(prev => (prev === 'teacher' ? 'teacher' : derived));
+                await persistRoleToMetadataIfNeeded(metaRole, session.user.email, derived);
+                if (!roleList || roleList.length === 0) {
+                  await tryEnsureUserRole(session.user.id, derived);
+                  setRoles([derived]);
+                }
+              }
+            } finally {
+              setLoading(false);
             }
-          } else {
+            break;
+          }
+          case 'SIGNED_OUT': {
+            // Reset state and redirect to login
             setRoles([]);
             setEffectiveRole(null);
-            // When session becomes null due to logout, redirect to login
-            if (event === 'SIGNED_OUT' && window.location.pathname !== '/login') {
+            if (window.location.pathname !== '/login') {
               window.location.replace('/login');
             }
+            break;
           }
-        } finally {
-          setLoading(false);
+          case 'TOKEN_REFRESHED':
+          case 'USER_UPDATED':
+          case 'INITIAL_SESSION':
+          default: {
+            // Do not toggle loading for token refresh or passive updates; keep current roles/effectiveRole
+            break;
+          }
         }
       }
     );

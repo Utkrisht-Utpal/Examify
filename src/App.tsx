@@ -24,7 +24,7 @@ const App = () => (
           <Routes>
             <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/login" element={<Login />} />
-            <Route path="/logout" element={<ProtectedRoute><Logout /></ProtectedRoute>} />
+            <Route path="/logout" element={<Logout />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
