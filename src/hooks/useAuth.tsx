@@ -21,7 +21,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   // Ensure a profile row and default role exist for the authenticated user
-  const ensureProfileAndRole = async (uid: string, email: string | null, fullName?: string | null) => {
+  const ensureProfile = async (uid: string, email: string | null, fullName?: string | null) => {
     try {
       const { data: profile } = await supabase
         .from('profiles')
@@ -36,20 +36,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         });
       }
 
-      const { data: rolesExisting } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', uid);
-
-      // If no roles yet, only auto-assign student when there is no pending role hint.
-      let pendingRole: string | null = null;
-      try { pendingRole = localStorage.getItem('pendingRole'); } catch {}
-
-      if ((!rolesExisting || rolesExisting.length === 0) && !pendingRole) {
-        await supabase.from('user_roles').insert({ user_id: uid, role: 'student' });
-      }
     } catch (e) {
-      console.warn('ensureProfileAndRole warning:', e);
+      console.warn('ensureProfile warning:', e);
     }
   };
 
@@ -62,23 +50,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           setUser(session?.user ?? null);
           
           if (session?.user) {
-            // Ensure profile row exists
-            await ensureProfileAndRole(session.user.id, session.user.email, (session.user.user_metadata as any)?.full_name);
+          // Ensure profile row exists
+            await ensureProfile(session.user.id, session.user.email, (session.user.user_metadata as any)?.full_name);
   
-            // Apply any pending role choice from registration (student/teacher)
-            try {
-              const pendingRole = localStorage.getItem('pendingRole');
-              if (pendingRole === 'student' || pendingRole === 'teacher') {
-                await supabase
-                  .from('user_roles')
-                  .insert({ user_id: session.user.id, role: pendingRole })
-                  .select()
-                  .single();
-                localStorage.removeItem('pendingRole');
-              }
-            } catch {
-              // ignore
-            }
   
             // Fetch user roles
             try {
@@ -106,7 +80,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   
         if (session?.user) {
           try {
-            await ensureProfileAndRole(session.user.id, session.user.email, (session.user.user_metadata as any)?.full_name);
+            await ensureProfile(session.user.id, session.user.email, (session.user.user_metadata as any)?.full_name);
             const { data: rolesData } = await supabase
               .from('user_roles')
               .select('role')
@@ -130,22 +104,25 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, [loading]);
 
   const signUp = async (email: string, password: string, fullName: string, role: string) => {
-    // Remember selected role; it will be applied on first authenticated session after email confirmation
-    try { localStorage.setItem('pendingRole', role); } catch {}
-
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         emailRedirectTo: `${window.location.origin}/`,
-        data: { full_name: fullName }
+        data: { full_name: fullName, role }
       }
     });
-    if (error) throw error;
+    if (error) {
+      const msg = (error.message || '').toLowerCase();
+      if (msg.includes('registered') || msg.includes('exists') || msg.includes('email')) {
+        throw new Error('This email is already registered. Please sign in instead.');
+      }
+      throw error;
+    }
     // No immediate sign-in; user will confirm email then sign in. Role is applied in onAuthStateChange.
   };
 
-  const signIn = async (email: string, password: string, expectedRole?: 'student' | 'teacher') => {
+  const signIn = async (email: string, password: string) => {
     console.log('Attempting sign in with email:', email);
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
@@ -157,33 +134,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const userId = data.user?.id;
     if (!userId) return;
 
-    // Fetch roles from DB and enforce expected role if provided
-    const { data: rolesData, error: rolesError } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', userId);
+    // Roles are optional now; role is primarily stored in auth user metadata
+    try {
+      const { data: rolesData } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', userId);
+      setRoles((rolesData || []).map(r => r.role));
+    } catch {}
 
-    if (rolesError) throw rolesError;
-    const roleList = rolesData?.map(r => r.role) || [];
-    setRoles(roleList);
-
-    if (expectedRole && !roleList.includes(expectedRole)) {
-      // Role mismatch: sign out to prevent wrong dashboard access
-      await supabase.auth.signOut();
-      setUser(null);
-      setSession(null);
-      setRoles([]);
-      throw new Error(`This account is not registered as ${expectedRole}.`);
-    }
-
-    console.log('Sign in successful:', data.user?.email, 'roles:', roleList);
+    console.log('Sign in successful:', data.user?.email);
   };
 
   const signOut = async () => {
     try {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
-      try { localStorage.removeItem('pendingRole'); } catch {}
       setRoles([]);
       setUser(null);
       setSession(null);

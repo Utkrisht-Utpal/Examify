@@ -7,19 +7,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { BookOpen, GraduationCap, Users, Shield } from "lucide-react";
 
 interface LoginFormProps {
-  onLogin: (email: string, password: string, role: 'student' | 'teacher') => void;
+  onLogin: (email: string, password: string) => void;
   onSwitchToRegister: () => void;
 }
 
 export const LoginForm = ({ onLogin, onSwitchToRegister }: LoginFormProps) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<'student' | 'teacher' | ''>('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (email && password && role) {
-      onLogin(email, password, role);
+    if (email && password) {
+      onLogin(email, password);
     }
   };
 
@@ -55,30 +54,7 @@ export const LoginForm = ({ onLogin, onSwitchToRegister }: LoginFormProps) => {
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="role">Sign in as</Label>
-            <Select value={role} onValueChange={(v) => setRole(v as 'student' | 'teacher')} required>
-              <SelectTrigger>
-                <SelectValue placeholder="Select role" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="student">
-                  <div className="flex items-center gap-2">
-                    <GraduationCap className="h-4 w-4" />
-                    Student
-                  </div>
-                </SelectItem>
-                <SelectItem value="teacher">
-                  <div className="flex items-center gap-2">
-                    <Users className="h-4 w-4" />
-                    Teacher
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <Button type="submit" className="w-full" disabled={!email || !password || !role}>
+          <Button type="submit" className="w-full" disabled={!email || !password}>
             Sign In
           </Button>
 

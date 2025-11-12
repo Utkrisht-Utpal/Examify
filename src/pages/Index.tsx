@@ -128,11 +128,15 @@ const Index = () => {
   }
 
   // Get user profile data
-  // Determine role strictly from DB roles
-  let computedRole = 'student';
-  if (roles?.includes('teacher')) computedRole = 'teacher';
-  else if (roles?.includes('student')) computedRole = 'student';
-  else if (roles?.length) computedRole = roles[0];
+  // Determine role from auth user metadata first; fall back to DB roles, then 'student'
+  const metaRole = (authUser.user_metadata?.role as string | undefined);
+  let computedRole = metaRole === 'teacher' || metaRole === 'student' ? metaRole : undefined;
+  if (!computedRole) {
+    if (roles?.includes('teacher')) computedRole = 'teacher';
+    else if (roles?.includes('student')) computedRole = 'student';
+    else if (roles?.length) computedRole = roles[0];
+    else computedRole = 'student';
+  }
 
   const user: User = {
     name: authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || 'User',
