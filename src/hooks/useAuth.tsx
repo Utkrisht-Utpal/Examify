@@ -21,6 +21,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [roles, setRoles] = useState<string[]>([]);
   const [effectiveRole, setEffectiveRole] = useState<'student' | 'teacher' | null>(null);
   const [loading, setLoading] = useState(true);
+  const PROJECT_REF = (import.meta as any)?.env?.VITE_SUPABASE_PROJECT_ID as string | undefined;
 
   // Ensure a profile row exist for the authenticated user
   const ensureProfile = async (uid: string, email: string | null, fullName?: string | null) => {
@@ -207,8 +208,27 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const signOut = async () => {
     try {
       setLoading(true);
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
+      // Attempt normal sign-out
+      await supabase.auth.signOut();
+
+      // Hard clear any lingering Supabase auth tokens in localStorage for this project
+      try {
+        const keys: string[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (!k) continue;
+          const isThisProject = PROJECT_REF ? k.startsWith(`sb-${PROJECT_REF}-`) : k.startsWith('sb-');
+          const isAuthToken = /sb-.*-auth-token/i.test(k) || k.includes('supabase.auth.token') || k.includes('supabase.auth.refresh-token');
+          if (isThisProject || isAuthToken) keys.push(k);
+        }
+        keys.forEach(k => localStorage.removeItem(k));
+      } catch {}
+
+      // Clear our own cached role
+      try {
+        if (user?.email) localStorage.removeItem(`accountRole:${user.email.toLowerCase()}`);
+      } catch {}
+
       setRoles([]);
       setEffectiveRole(null);
       setUser(null);
