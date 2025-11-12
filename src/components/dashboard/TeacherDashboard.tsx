@@ -29,6 +29,8 @@ export const TeacherDashboard = ({ user, onCreateExam, onViewResults, onViewExam
   // Get current user ID from Supabase
   const [userId, setUserId] = React.useState<string | null>(null);
   const [studentCount, setStudentCount] = React.useState<number>(0);
+  const [avgPercentage, setAvgPercentage] = React.useState<number>(0);
+  const [avgCount, setAvgCount] = React.useState<number>(0);
   
   React.useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id || null));
@@ -74,6 +76,45 @@ export const TeacherDashboard = ({ user, onCreateExam, onViewResults, onViewExam
   }, []);
 
   const teacherExams = exams?.filter(exam => exam.created_by === userId) || [];
+  const teacherExamIds = teacherExams.map(e => e.id);
+
+  // Fetch average percentage for this teacher's exams and keep it updated in realtime
+  React.useEffect(() => {
+    const fetchAverages = async () => {
+      if (!teacherExamIds || teacherExamIds.length === 0) {
+        setAvgPercentage(0);
+        setAvgCount(0);
+        return;
+      }
+      const { data, error } = await supabase
+        .from('results')
+        .select('percentage, exam_id')
+        .in('exam_id', teacherExamIds);
+      if (error) return; // Silently ignore for UI stability
+      const percentages = (data || []).map(r => r.percentage).filter((p): p is number => typeof p === 'number');
+      const avg = percentages.length > 0 ? Math.round(percentages.reduce((a, b) => a + b, 0) / percentages.length) : 0;
+      setAvgPercentage(avg);
+      setAvgCount(percentages.length);
+    };
+
+    fetchAverages();
+
+    // Realtime updates for results table
+    const channel = supabase
+      .channel('results_changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'results' },
+        () => {
+          fetchAverages();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [teacherExamIds.join(',')]);
   
   // Group submissions by exam for quick counts
   const submissionsByExam: Record<string, number> = (submissions || []).reduce((acc: Record<string, number>, s: any) => {
@@ -176,9 +217,9 @@ export const TeacherDashboard = ({ user, onCreateExam, onViewResults, onViewExam
             <BarChart3 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-primary">82%</div>
+            <div className="text-2xl font-bold text-primary">{avgPercentage}%</div>
             <p className="text-xs text-muted-foreground">
-              +2% from last month
+              Based on {avgCount} graded submissions
             </p>
           </CardContent>
         </Card>
