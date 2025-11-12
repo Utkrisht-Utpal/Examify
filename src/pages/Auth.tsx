@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { LoginForm } from "@/components/auth/LoginForm";
 import { RegisterForm } from "@/components/auth/RegisterForm";
 import { BookOpen, GraduationCap, Shield, Users } from "lucide-react";
@@ -12,6 +13,7 @@ interface AuthProps {
 const Auth = ({ signIn, signUp }: AuthProps) => {
   const [isLogin, setIsLogin] = useState(true);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   const handleLogin = async (email: string, password: string) => {
     try {
@@ -20,6 +22,8 @@ const Auth = ({ signIn, signUp }: AuthProps) => {
         title: "Login Successful",
         description: `Welcome back!`,
       });
+      // Navigate to dashboard after successful login
+      navigate('/', { replace: true });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Invalid email or password. Please check your credentials and try again.";
       console.error('Login error details:', error);
