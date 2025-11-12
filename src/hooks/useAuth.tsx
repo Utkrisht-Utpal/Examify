@@ -98,53 +98,92 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     let mounted = true;
-    let initialCheckDone = false;
     
     // Function to load user session and roles
     const loadUserSession = async (session: Session | null) => {
       if (!mounted) return;
+      
+      console.log('Loading user session...', { hasSession: !!session, userId: session?.user?.id });
       
       setSession(session);
       setUser(session?.user ?? null);
       
       if (session?.user) {
         try {
+          // Ensure profile exists
           await ensureProfile(session.user.id, session.user.email, (session.user.user_metadata as { full_name?: string })?.full_name);
+          
           // Fetch user roles
           let roleList: string[] = [];
           try {
-            const { data: rolesData } = await supabase
+            console.log('Fetching user roles for:', session.user.id);
+            const { data: rolesData, error: rolesError } = await supabase
               .from('user_roles')
               .select('role')
               .eq('user_id', session.user.id);
-            roleList = (rolesData || []).map(r => r.role);
-            if (mounted) setRoles(roleList);
-          } catch (e) { console.warn('Role fetch error:', e); }
+            
+            if (rolesError) {
+              console.error('Error fetching roles:', rolesError);
+            } else {
+              roleList = (rolesData || []).map(r => r.role);
+              console.log('Roles fetched:', roleList);
+              if (mounted) setRoles(roleList);
+            }
+          } catch (e) { 
+            console.error('Role fetch exception:', e); 
+          }
+          
+          // Derive effective role
           const metaRole = (session.user.user_metadata as { role?: string })?.role;
           const derived = deriveRole(metaRole, roleList, session.user.email);
+          
           if (mounted) {
             setEffectiveRole(derived);
-            console.log('User session loaded, role:', derived);
+            console.log('✓ User session loaded successfully. Role:', derived, 'Roles:', roleList);
           }
+          
+          // Persist role to metadata if needed
           await persistRoleToMetadataIfNeeded(metaRole, session.user.email, derived);
+          
+          // Ensure user_roles row exists if empty
           if (!roleList || roleList.length === 0) {
             await tryEnsureUserRole(session.user.id, derived);
             if (mounted) setRoles([derived]);
           }
         } catch (e) {
-          console.warn('Error loading user session:', e);
+          console.error('Error loading user session:', e);
+          // Even on error, set a default role so UI doesn't break
+          if (mounted && !effectiveRole) {
+            const fallbackRole = (session.user.user_metadata as { role?: string })?.role || 'student';
+            setEffectiveRole(fallbackRole as 'student' | 'teacher');
+            console.warn('Using fallback role:', fallbackRole);
+          }
         }
       } else {
         // No session - clear everything
         if (mounted) {
           setRoles([]);
           setEffectiveRole(null);
-          console.log('No session found');
+          console.log('No session found - clearing auth state');
         }
       }
     };
     
-    // Set up auth state listener
+    // Initialize: Check for session immediately on mount
+    (async () => {
+      try {
+        console.log('Checking for existing session on mount...');
+        const { data: { session } } = await supabase.auth.getSession();
+        console.log('Session check result:', !!session);
+        await loadUserSession(session);
+      } catch (error) {
+        console.error('Error checking session:', error);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    
+    // Set up auth state listener for future changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!mounted) return;
@@ -153,17 +192,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
         // Handle events
         switch (event) {
-          case 'INITIAL_SESSION': {
-            // This fires on mount with the current session
-            try {
-              setLoading(true);
-              await loadUserSession(session);
-              initialCheckDone = true;
-            } finally {
-              if (mounted) setLoading(false);
-            }
-            break;
-          }
           case 'SIGNED_IN': {
             try {
               setLoading(true);
@@ -199,24 +227,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         }
       }
     );
-    
-    // Fallback: if INITIAL_SESSION doesn't fire within 1 second, manually check
-    const fallbackTimer = setTimeout(async () => {
-      if (!initialCheckDone && mounted) {
-        console.warn('INITIAL_SESSION not fired, manually checking session');
-        try {
-          setLoading(true);
-          const { data: { session } } = await supabase.auth.getSession();
-          await loadUserSession(session);
-        } finally {
-          if (mounted) setLoading(false);
-        }
-      }
-    }, 1000);
 
     return () => {
       mounted = false;
-      clearTimeout(fallbackTimer);
       subscription.unsubscribe();
     };
   }, []);
