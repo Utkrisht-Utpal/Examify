@@ -70,7 +70,33 @@ export const useExams = () => {
     }
   });
 
-  return { exams, isLoading, createExam, updateExamStatus };
+  const deleteExam = useMutation({
+    mutationFn: async (examId: string) => {
+      const { error } = await supabase
+        .from('exams')
+        .delete()
+        .eq('id', examId);
+      if (error) throw error;
+      return examId;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['exams'] });
+      toast({
+        title: 'Deleted',
+        description: 'Exam deleted successfully'
+      });
+    },
+    onError: (error) => {
+      const errorMessage = error instanceof Error ? error.message : 'An error occurred';
+      toast({
+        title: 'Error deleting exam',
+        description: errorMessage,
+        variant: 'destructive'
+      });
+    }
+  });
+
+  return { exams, isLoading, createExam, updateExamStatus, deleteExam };
 };
 
 export const useExamWithQuestions = (examId: string) => {

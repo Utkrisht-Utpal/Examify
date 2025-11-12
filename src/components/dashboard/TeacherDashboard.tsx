@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { PlusCircle, BookOpen, Users, BarChart3, FileText, Calendar, Eye, Clock } from "lucide-react";
+import { PlusCircle, BookOpen, Users, BarChart3, FileText, Calendar, Eye, Clock, Trash2 } from "lucide-react";
 import { useExams } from "@/hooks/useExams";
 import { useSubmissions } from "@/hooks/useSubmissions";
 import { useGrading } from "@/hooks/useGrading";
@@ -22,7 +22,7 @@ interface TeacherDashboardProps {
 }
 
 export const TeacherDashboard = ({ user, onCreateExam, onViewResults, onViewExam, onGradeSubmission }: TeacherDashboardProps) => {
-  const { exams, isLoading: examsLoading, updateExamStatus } = useExams();
+  const { exams, isLoading: examsLoading, updateExamStatus, deleteExam } = useExams();
   const { submissions } = useSubmissions();
   const { pendingSubmissions, isLoadingSubmissions } = useGrading();
   
@@ -91,6 +91,12 @@ export const TeacherDashboard = ({ user, onCreateExam, onViewResults, onViewExam
 
   const handlePublishExam = (examId: string) => {
     updateExamStatus.mutate({ examId, status: 'published' });
+  };
+
+  const handleDeleteExam = (examId: string) => {
+    if (confirm('Are you sure you want to delete this exam? This will remove all related questions, submissions, and results.')) {
+      deleteExam.mutate(examId);
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -274,6 +280,15 @@ export const TeacherDashboard = ({ user, onCreateExam, onViewResults, onViewExam
                             {updateExamStatus.isPending ? 'Publishing...' : 'Publish'}
                           </Button>
                         )}
+                        <Button 
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => handleDeleteExam(exam.id)}
+                          disabled={deleteExam.isPending}
+                        >
+                          <Trash2 className="h-4 w-4 mr-1" />
+                          {deleteExam.isPending ? 'Deleting...' : 'Delete'}
+                        </Button>
                       </div>
                     </div>
                   ))}
