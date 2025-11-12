@@ -20,25 +20,52 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [roles, setRoles] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Ensure a profile row and default role exist for the authenticated user
+  const ensureProfileAndRole = async (uid: string, email: string | null, fullName?: string | null) => {
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', uid)
+        .maybeSingle();
+      if (!profile) {
+        await supabase.from('profiles').insert({
+          id: uid,
+          email: email ?? '',
+          full_name: fullName || (email ? email.split('@')[0] : 'User')
+        });
+      }
+
+      const { data: rolesExisting } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', uid);
+      if (!rolesExisting || rolesExisting.length === 0) {
+        // Default everyone to student until explicitly granted teacher/admin
+        await supabase.from('user_roles').insert({ user_id: uid, role: 'student' });
+      }
+    } catch (e) {
+      console.warn('ensureProfileAndRole warning:', e);
+    }
+  };
+
   useEffect(() => {
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      async (_event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
         
         if (session?.user) {
+          // Ensure profile and role
+          await ensureProfileAndRole(session.user.id, session.user.email, (session.user.user_metadata as any)?.full_name);
+
           // Fetch user roles
-          setTimeout(async () => {
-            const { data: rolesData } = await supabase
-              .from('user_roles')
-              .select('role')
-              .eq('user_id', session.user.id);
-            
-            if (rolesData) {
-              setRoles(rolesData.map(r => r.role));
-            }
-          }, 0);
+          const { data: rolesData } = await supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', session.user.id);
+          if (rolesData) setRoles(rolesData.map(r => r.role));
         } else {
           setRoles([]);
         }
@@ -46,24 +73,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     );
 
     // Check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
       
       if (session?.user) {
-        supabase
+        await ensureProfileAndRole(session.user.id, session.user.email, (session.user.user_metadata as any)?.full_name);
+        const { data: rolesData } = await supabase
           .from('user_roles')
           .select('role')
-          .eq('user_id', session.user.id)
-          .then(({ data: rolesData }) => {
-            if (rolesData) {
-              setRoles(rolesData.map(r => r.role));
-            }
-            setLoading(false);
-          });
-      } else {
-        setLoading(false);
+          .eq('user_id', session.user.id);
+        if (rolesData) setRoles(rolesData.map(r => r.role));
       }
+      setLoading(false);
     });
 
     return () => subscription.unsubscribe();
@@ -83,13 +105,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     if (error) throw error;
 
-    // After user is created, add their role
+    // After user is created and session established, ensure profile and role
     if (data.user) {
+      await ensureProfileAndRole(data.user.id, data.user.email, fullName);
       const { error: roleError } = await supabase
         .from('user_roles')
-        .insert({ user_id: data.user.id, role });
-      
-      if (roleError) throw roleError;
+        .insert({ user_id: data.user.id, role })
+        .select()
+        .single();
+      // Ignore conflict if role already exists
+      if (roleError && (roleError as any).code !== '23505') throw roleError;
     }
   };
 
