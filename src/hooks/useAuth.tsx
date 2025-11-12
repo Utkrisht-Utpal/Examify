@@ -98,6 +98,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     let mounted = true;
+    let isOnline = navigator.onLine;
+    
+    // Listen for online/offline events
+    const handleOnline = () => {
+      isOnline = true;
+      console.log('✓ Network connection restored');
+    };
+    const handleOffline = () => {
+      isOnline = false;
+      console.warn('⚠️ Network connection lost');
+    };
+    
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
     
     // Function to load user session and roles
     const loadUserSession = async (session: Session | null) => {
@@ -124,40 +138,58 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           ensureProfile(session.user.id, session.user.email, (session.user.user_metadata as { full_name?: string })?.full_name)
             .catch(e => console.warn('ensureProfile failed:', e));
           
-          // Fetch user roles from database (non-blocking)
-          try {
-            console.log('Fetching user roles for:', session.user.id);
-            const { data: rolesData, error: rolesError } = await supabase
-              .from('user_roles')
-              .select('role')
-              .eq('user_id', session.user.id);
-            
-            if (rolesError) {
-              console.error('Error fetching roles:', rolesError);
-            } else {
+          // Fetch user roles from database with timeout
+          const fetchRoles = async () => {
+            try {
+              console.log('Fetching user roles for:', session.user.id);
+              const { data: rolesData, error: rolesError } = await supabase
+                .from('user_roles')
+                .select('role')
+                .eq('user_id', session.user.id);
+              
+              if (rolesError) {
+                console.error('Error fetching roles:', rolesError);
+                return [quickRole];
+              }
+              
               const roleList = (rolesData || []).map(r => r.role);
               console.log('Roles fetched from DB:', roleList);
-              if (mounted) setRoles(roleList);
               
-              // Update effective role if DB has different data
               if (roleList.length > 0) {
                 const derived = deriveRole(metaRole, roleList, session.user.email);
-                if (mounted && derived !== quickRole) {
-                  setEffectiveRole(derived);
-                  console.log('Updated role from DB:', derived);
+                if (mounted) {
+                  setRoles(roleList);
+                  if (derived !== quickRole) {
+                    setEffectiveRole(derived);
+                    console.log('Updated role from DB:', derived);
+                  }
                 }
+                return roleList;
               } else {
-                // No DB roles, ensure one exists
+                // No DB roles, ensure one exists (background)
                 tryEnsureUserRole(session.user.id, quickRole as 'student' | 'teacher')
                   .catch(e => console.warn('tryEnsureUserRole failed:', e));
                 if (mounted) setRoles([quickRole]);
+                return [quickRole];
               }
+            } catch (e) { 
+              console.error('Role fetch exception:', e);
+              if (mounted) setRoles([quickRole]);
+              return [quickRole];
             }
-          } catch (e) { 
-            console.error('Role fetch exception:', e);
-            // Use metadata role as fallback
-            if (mounted) setRoles([quickRole]);
-          }
+          };
+          
+          // Fetch roles with 2-second timeout
+          const rolesPromise = fetchRoles();
+          const timeoutPromise = new Promise<string[]>((resolve) => {
+            setTimeout(() => {
+              console.warn('Role fetch timed out after 2s, using metadata role');
+              if (mounted) setRoles([quickRole]);
+              resolve([quickRole]);
+            }, 2000);
+          });
+          
+          await Promise.race([rolesPromise, timeoutPromise]);
           
           // Persist role to metadata if needed (non-blocking)
           persistRoleToMetadataIfNeeded(metaRole, session.user.email, quickRole as 'student' | 'teacher')
@@ -260,6 +292,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return () => {
       mounted = false;
       subscription.unsubscribe();
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
     };
   }, []);
 
