@@ -110,11 +110,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       
       if (session?.user) {
         try {
-          // Ensure profile exists
-          await ensureProfile(session.user.id, session.user.email, (session.user.user_metadata as { full_name?: string })?.full_name);
+          // Get role from metadata immediately for fast UI
+          const metaRole = (session.user.user_metadata as { role?: string })?.role;
+          const quickRole = metaRole || 'student';
           
-          // Fetch user roles
-          let roleList: string[] = [];
+          // Set role immediately from metadata
+          if (mounted) {
+            setEffectiveRole(quickRole as 'student' | 'teacher');
+            console.log('✓ Quick role set from metadata:', quickRole);
+          }
+          
+          // Ensure profile exists (non-blocking, in background)
+          ensureProfile(session.user.id, session.user.email, (session.user.user_metadata as { full_name?: string })?.full_name)
+            .catch(e => console.warn('ensureProfile failed:', e));
+          
+          // Fetch user roles from database (non-blocking)
           try {
             console.log('Fetching user roles for:', session.user.id);
             const { data: rolesData, error: rolesError } = await supabase
@@ -125,37 +135,41 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             if (rolesError) {
               console.error('Error fetching roles:', rolesError);
             } else {
-              roleList = (rolesData || []).map(r => r.role);
-              console.log('Roles fetched:', roleList);
+              const roleList = (rolesData || []).map(r => r.role);
+              console.log('Roles fetched from DB:', roleList);
               if (mounted) setRoles(roleList);
+              
+              // Update effective role if DB has different data
+              if (roleList.length > 0) {
+                const derived = deriveRole(metaRole, roleList, session.user.email);
+                if (mounted && derived !== quickRole) {
+                  setEffectiveRole(derived);
+                  console.log('Updated role from DB:', derived);
+                }
+              } else {
+                // No DB roles, ensure one exists
+                tryEnsureUserRole(session.user.id, quickRole as 'student' | 'teacher')
+                  .catch(e => console.warn('tryEnsureUserRole failed:', e));
+                if (mounted) setRoles([quickRole]);
+              }
             }
           } catch (e) { 
-            console.error('Role fetch exception:', e); 
+            console.error('Role fetch exception:', e);
+            // Use metadata role as fallback
+            if (mounted) setRoles([quickRole]);
           }
           
-          // Derive effective role
-          const metaRole = (session.user.user_metadata as { role?: string })?.role;
-          const derived = deriveRole(metaRole, roleList, session.user.email);
-          
-          if (mounted) {
-            setEffectiveRole(derived);
-            console.log('✓ User session loaded successfully. Role:', derived, 'Roles:', roleList);
-          }
-          
-          // Persist role to metadata if needed
-          await persistRoleToMetadataIfNeeded(metaRole, session.user.email, derived);
-          
-          // Ensure user_roles row exists if empty
-          if (!roleList || roleList.length === 0) {
-            await tryEnsureUserRole(session.user.id, derived);
-            if (mounted) setRoles([derived]);
-          }
+          // Persist role to metadata if needed (non-blocking)
+          persistRoleToMetadataIfNeeded(metaRole, session.user.email, quickRole as 'student' | 'teacher')
+            .catch(e => console.warn('persistRoleToMetadataIfNeeded failed:', e));
+            
         } catch (e) {
           console.error('Error loading user session:', e);
           // Even on error, set a default role so UI doesn't break
-          if (mounted && !effectiveRole) {
+          if (mounted) {
             const fallbackRole = (session.user.user_metadata as { role?: string })?.role || 'student';
             setEffectiveRole(fallbackRole as 'student' | 'teacher');
+            setRoles([fallbackRole]);
             console.warn('Using fallback role:', fallbackRole);
           }
         }
@@ -175,11 +189,25 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         console.log('Checking for existing session on mount...');
         const { data: { session } } = await supabase.auth.getSession();
         console.log('Session check result:', !!session);
-        await loadUserSession(session);
+        
+        // Load session with a timeout to prevent hanging
+        const loadPromise = loadUserSession(session);
+        const timeoutPromise = new Promise((resolve) => {
+          setTimeout(() => {
+            console.warn('loadUserSession timed out after 4s');
+            resolve(null);
+          }, 4000);
+        });
+        
+        await Promise.race([loadPromise, timeoutPromise]);
+        console.log('Session initialization complete');
       } catch (error) {
         console.error('Error checking session:', error);
       } finally {
-        if (mounted) setLoading(false);
+        if (mounted) {
+          console.log('Setting loading to false');
+          setLoading(false);
+        }
       }
     })();
     
@@ -238,11 +266,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     if (!loading) return;
     const id = setTimeout(() => {
-      console.warn('Auth loading timeout reached - forcing loading to false');
+      console.warn('Auth loading timeout reached (5s) - forcing loading to false');
       setLoading(false);
-    }, 3000);
+      // If we have a session but no role, use fallback
+      if (session?.user && !effectiveRole) {
+        const fallback = (session.user.user_metadata as { role?: string })?.role || 'student';
+        setEffectiveRole(fallback as 'student' | 'teacher');
+        console.warn('Applied fallback role due to timeout:', fallback);
+      }
+    }, 5000);
     return () => clearTimeout(id);
-  }, [loading]);
+  }, [loading, session, effectiveRole]);
 
   const signUp = async (email: string, password: string, fullName: string, role: string) => {
     try { localStorage.setItem(`accountRole:${email.toLowerCase()}`, role); } catch (e) { /* ignore cache write */ }
