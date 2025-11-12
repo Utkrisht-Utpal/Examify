@@ -243,12 +243,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const signOut = async () => {
-    try {
-      setLoading(true);
-      // Attempt normal sign-out
-      await supabase.auth.signOut();
-
-      // Hard clear any lingering Supabase auth tokens in localStorage for this project
+    const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
+    const clearAuthStorage = () => {
+      // Clear Supabase tokens in localStorage/sessionStorage
       try {
         const keys: string[] = [];
         for (let i = 0; i < localStorage.length; i++) {
@@ -260,19 +257,47 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         }
         keys.forEach(k => localStorage.removeItem(k));
       } catch {}
-
+      try {
+        const sKeys: string[] = [];
+        for (let i = 0; i < sessionStorage.length; i++) {
+          const k = sessionStorage.key(i);
+          if (!k) continue;
+          const isThisProject = PROJECT_REF ? k.startsWith(`sb-${PROJECT_REF}-`) : k.startsWith('sb-');
+          const isAuthToken = /sb-.*-auth-token/i.test(k) || k.includes('supabase.auth.token') || k.includes('supabase.auth.refresh-token');
+          if (isThisProject || isAuthToken) sKeys.push(k);
+        }
+        sKeys.forEach(k => sessionStorage.removeItem(k));
+      } catch {}
       // Clear our own cached role
       try {
         if (user?.email) localStorage.removeItem(`accountRole:${user.email.toLowerCase()}`);
       } catch {}
+    };
 
+    try {
+      setLoading(true);
+      // Fast attempt: global sign-out (revokes refresh token). Fallback to local after a short timeout.
+      await Promise.race([
+        supabase.auth.signOut().catch(() => {}),
+        sleep(1500)
+      ]);
+    } catch {
+      // ignore
+    } finally {
+      // Ensure local sign-out regardless of network state
+      try { await supabase.auth.signOut({ scope: 'local' } as any); } catch {}
+      clearAuthStorage();
       setRoles([]);
       setEffectiveRole(null);
       setUser(null);
       setSession(null);
-    } finally {
       setLoading(false);
-      try { window.location.assign('/'); } catch {}
+      try {
+        // Replace history entry to avoid back-button restoring the session
+        window.location.replace('/');
+        // Fallback reload in case SPA routing intercepts
+        setTimeout(() => { try { window.location.reload(); } catch {} }, 100);
+      } catch {}
     }
   };
 
