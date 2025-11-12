@@ -57,8 +57,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          // Ensure profile and role
+          // Ensure profile row exists
           await ensureProfileAndRole(session.user.id, session.user.email, (session.user.user_metadata as any)?.full_name);
+
+          // Apply any pending role choice from registration (student/teacher)
+          try {
+            const pendingRole = localStorage.getItem('pendingRole');
+            if (pendingRole === 'student' || pendingRole === 'teacher') {
+              await supabase
+                .from('user_roles')
+                .insert({ user_id: session.user.id, role: pendingRole })
+                .select()
+                .single();
+              localStorage.removeItem('pendingRole');
+            }
+          } catch (e) {
+            // Ignore unique constraint or RLS mismatch silently
+          }
 
           // Fetch user roles
           const { data: rolesData } = await supabase
@@ -92,6 +107,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const signUp = async (email: string, password: string, fullName: string, role: string) => {
+    // Remember the role the user selected so we can apply it after email confirmation/sign-in
+    try { localStorage.setItem('pendingRole', role); } catch {}
+
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -105,16 +123,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     if (error) throw error;
 
-    // After user is created and session established, ensure profile and role
-    if (data.user) {
+    // After sign up: if a session exists (email confirmations disabled), seed profile and role now.
+    // Otherwise, onAuthStateChange will run after the user confirms email and signs in.
+    if (data.session?.user && data.user) {
       await ensureProfileAndRole(data.user.id, data.user.email, fullName);
-      const { error: roleError } = await supabase
-        .from('user_roles')
-        .insert({ user_id: data.user.id, role })
-        .select()
-        .single();
-      // Ignore conflict if role already exists
-      if (roleError && (roleError as any).code !== '23505') throw roleError;
+      // Only allow self-assigning the 'student' role. Teacher/Admin must be granted later by an admin.
+      if (role === 'student') {
+        const { error: roleError } = await supabase
+          .from('user_roles')
+          .insert({ user_id: data.user.id, role: 'student' })
+          .select()
+          .single();
+        // Ignore conflict if role already exists
+        if (roleError && (roleError as any).code !== '23505') throw roleError;
+      }
     }
   };
 

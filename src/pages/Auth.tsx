@@ -45,8 +45,8 @@ const Auth = ({ signIn, signUp }: AuthProps) => {
     try {
       await signUp(email, password, name, role);
       toast({
-        title: "Registration Successful",
-        description: `Welcome, ${name}! You can now sign in.`,
+        title: "Registration Submitted",
+        description: `Welcome, ${name}! If email confirmation is enabled, please check your inbox to verify your account before signing in.`,
       });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Registration failed";

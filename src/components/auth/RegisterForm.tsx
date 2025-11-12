@@ -107,12 +107,6 @@ export const RegisterForm = ({ onRegister, onSwitchToLogin }: RegisterFormProps)
                     Teacher
                   </div>
                 </SelectItem>
-                <SelectItem value="admin">
-                  <div className="flex items-center gap-2">
-                    <Shield className="h-4 w-4" />
-                    Administrator
-                  </div>
-                </SelectItem>
               </SelectContent>
             </Select>
           </div>
