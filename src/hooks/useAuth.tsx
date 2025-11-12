@@ -97,105 +97,137 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   useEffect(() => {
+    let mounted = true;
+    let initialCheckDone = false;
+    
+    // Function to load user session and roles
+    const loadUserSession = async (session: Session | null) => {
+      if (!mounted) return;
+      
+      setSession(session);
+      setUser(session?.user ?? null);
+      
+      if (session?.user) {
+        try {
+          await ensureProfile(session.user.id, session.user.email, (session.user.user_metadata as { full_name?: string })?.full_name);
+          // Fetch user roles
+          let roleList: string[] = [];
+          try {
+            const { data: rolesData } = await supabase
+              .from('user_roles')
+              .select('role')
+              .eq('user_id', session.user.id);
+            roleList = (rolesData || []).map(r => r.role);
+            if (mounted) setRoles(roleList);
+          } catch (e) { console.warn('Role fetch error:', e); }
+          const metaRole = (session.user.user_metadata as { role?: string })?.role;
+          const derived = deriveRole(metaRole, roleList, session.user.email);
+          if (mounted) {
+            setEffectiveRole(derived);
+            console.log('User session loaded, role:', derived);
+          }
+          await persistRoleToMetadataIfNeeded(metaRole, session.user.email, derived);
+          if (!roleList || roleList.length === 0) {
+            await tryEnsureUserRole(session.user.id, derived);
+            if (mounted) setRoles([derived]);
+          }
+        } catch (e) {
+          console.warn('Error loading user session:', e);
+        }
+      } else {
+        // No session - clear everything
+        if (mounted) {
+          setRoles([]);
+          setEffectiveRole(null);
+          console.log('No session found');
+        }
+      }
+    };
+    
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        // Always reflect latest session and user
-        setSession(session);
-        setUser(session?.user ?? null);
+        if (!mounted) return;
+        
+        console.log('Auth state change:', event, 'session:', !!session);
 
-        // Handle events with minimal UI disruption
+        // Handle events
         switch (event) {
+          case 'INITIAL_SESSION': {
+            // This fires on mount with the current session
+            try {
+              setLoading(true);
+              await loadUserSession(session);
+              initialCheckDone = true;
+            } finally {
+              if (mounted) setLoading(false);
+            }
+            break;
+          }
           case 'SIGNED_IN': {
             try {
               setLoading(true);
-              if (session?.user) {
-                await ensureProfile(session.user.id, session.user.email, (session.user.user_metadata as { full_name?: string })?.full_name);
-                // Fetch user roles only on sign-in
-                let roleList: string[] = [];
-                try {
-                  const { data: rolesData } = await supabase
-                    .from('user_roles')
-                    .select('role')
-                    .eq('user_id', session.user.id);
-                  roleList = (rolesData || []).map(r => r.role);
-                  setRoles(roleList);
-                } catch (e) { /* ignore role fetch errors */ }
-                const metaRole = (session.user.user_metadata as { role?: string })?.role;
-                const derived = deriveRole(metaRole, roleList, session.user.email);
-                setEffectiveRole(prev => (prev === 'teacher' ? 'teacher' : derived));
-                await persistRoleToMetadataIfNeeded(metaRole, session.user.email, derived);
-                if (!roleList || roleList.length === 0) {
-                  await tryEnsureUserRole(session.user.id, derived);
-                  setRoles([derived]);
-                }
-              }
+              await loadUserSession(session);
             } finally {
-              setLoading(false);
+              if (mounted) setLoading(false);
             }
             break;
           }
           case 'SIGNED_OUT': {
-            // Reset state and trigger navigation to login
+            // Reset state immediately
             setRoles([]);
             setEffectiveRole(null);
-            if (window.location.pathname !== '/login') {
+            setUser(null);
+            setSession(null);
+            setLoading(false);
+            // Trigger navigation to login if not already there
+            if (window.location.pathname !== '/login' && window.location.pathname !== '/logout') {
               setNavigateToLogin(true);
             }
             break;
           }
           case 'TOKEN_REFRESHED':
           case 'USER_UPDATED':
-          case 'INITIAL_SESSION':
           default: {
-            // Do not toggle loading for token refresh or passive updates; keep current roles/effectiveRole
+            // For token refresh, just update session/user without reloading everything
+            if (mounted) {
+              setSession(session);
+              setUser(session?.user ?? null);
+            }
             break;
           }
         }
       }
     );
-
-    // Check for existing session on mount (network-safe)
-    (async () => {
-      try {
-        setLoading(true);
-        const { data: { session } } = await supabase.auth.getSession();
-        setSession(session);
-        setUser(session?.user ?? null);
-  
-        if (session?.user) {
-          try {
-            await ensureProfile(session.user.id, session.user.email, (session.user.user_metadata as { full_name?: string })?.full_name);
-            const { data: rolesData } = await supabase
-              .from('user_roles')
-              .select('role')
-              .eq('user_id', session.user.id);
-            const roleList = (rolesData || []).map(r => r.role);
-            setRoles(roleList);
-            const metaRole = (session.user.user_metadata as { role?: string })?.role;
-            const derived = deriveRole(metaRole, roleList, session.user.email);
-            setEffectiveRole(prev => (prev === 'teacher' ? 'teacher' : derived));
-            await persistRoleToMetadataIfNeeded(metaRole, session.user.email, derived);
-            if (!roleList || roleList.length === 0) {
-              await tryEnsureUserRole(session.user.id, derived);
-              setRoles([derived]);
-            }
-          } catch (e) { /* ignore ensureProfile/role fetch errors on mount */ }
-        } else {
-          setEffectiveRole(null);
+    
+    // Fallback: if INITIAL_SESSION doesn't fire within 1 second, manually check
+    const fallbackTimer = setTimeout(async () => {
+      if (!initialCheckDone && mounted) {
+        console.warn('INITIAL_SESSION not fired, manually checking session');
+        try {
+          setLoading(true);
+          const { data: { session } } = await supabase.auth.getSession();
+          await loadUserSession(session);
+        } finally {
+          if (mounted) setLoading(false);
         }
-      } finally {
-        setLoading(false);
       }
-    })();
+    }, 1000);
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      clearTimeout(fallbackTimer);
+      subscription.unsubscribe();
+    };
   }, []);
 
   // Fallback: never keep the app in loading state indefinitely (e.g., slow network)
   useEffect(() => {
     if (!loading) return;
-    const id = setTimeout(() => setLoading(false), 3000);
+    const id = setTimeout(() => {
+      console.warn('Auth loading timeout reached - forcing loading to false');
+      setLoading(false);
+    }, 3000);
     return () => clearTimeout(id);
   }, [loading]);
 

@@ -122,6 +122,13 @@ const Index = () => {
   }
 
 
+  // Safety check - if no authUser, this shouldn't render (ProtectedRoute should handle it)
+  // But as a fallback, redirect to login
+  if (!authUser) {
+    navigate('/login', { replace: true });
+    return null;
+  }
+
   // Get user profile data
   // Use the effectiveRole. While loading (on first paint), show a tiny check spinner; otherwise require an auth user.
   if (loading && authUser && !role) {
@@ -134,6 +141,7 @@ const Index = () => {
       </div>
     );
   }
+  
   const finalRole = role || (authUser.user_metadata?.role as 'student' | 'teacher' | undefined) || 'student';
 
   const user: User = {
