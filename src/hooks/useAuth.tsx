@@ -95,7 +95,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
+      async (event, session) => {
         try {
           setLoading(true);
           setSession(session);
@@ -126,6 +126,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           } else {
             setRoles([]);
             setEffectiveRole(null);
+            // When session becomes null due to logout, redirect to login
+            if (event === 'SIGNED_OUT' && window.location.pathname !== '/login') {
+              window.location.replace('/login');
+            }
           }
         } finally {
           setLoading(false);
@@ -272,19 +276,33 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       } catch {}
     };
 
+    // Unregister all service workers to prevent cached dashboard HTML
+    const unregisterServiceWorkers = async () => {
+      try {
+        if ('serviceWorker' in navigator) {
+          const registrations = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(registrations.map(reg => reg.unregister()));
+        }
+      } catch {}
+    };
+
     setLoading(true);
     try {
-      // Server-side sign out (best-effort)
+      // Server-side sign out for current device/session
       try { await supabase.auth.signOut(); } catch {}
       // Drop realtime channels to prevent stray reconnects
       try { supabase.removeAllChannels(); } catch {}
       // Clear local auth artifacts
       clearAuthStorage();
+      // Unregister service workers
+      await unregisterServiceWorkers();
       // Reset state
       setRoles([]);
       setEffectiveRole(null);
       setUser(null);
       setSession(null);
+      // Hard redirect to login page (forces full page reload, clearing any SPA state)
+      window.location.replace('/login');
     } finally {
       setLoading(false);
     }

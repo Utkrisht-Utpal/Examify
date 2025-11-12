@@ -38,20 +38,10 @@ const Index = () => {
   const { toast } = useToast();
 
   const handleLogout = async () => {
-    try {
-      await signOut();
-    } catch (e) {
-      // ignore signout errors; proceed to client reset
-    } finally {
-      setCurrentView("dashboard");
-      setCurrentExamId(null);
-      toast({
-        title: "Logged Out",
-        description: "You have been successfully logged out.",
-      });
-      // Route to login using the client router to avoid reload loops
-      navigate('/login', { replace: true });
-    }
+    // Use dedicated /logout route to perform server sign-out then redirect to /login
+    setCurrentView("dashboard");
+    setCurrentExamId(null);
+    navigate('/logout', { replace: true });
   };
 
   const handleStartExam = (examId: string) => {
