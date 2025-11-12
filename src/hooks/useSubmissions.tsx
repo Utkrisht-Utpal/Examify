@@ -69,9 +69,10 @@ export const useSubmissions = (examId?: string) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['submissions'] });
+      queryClient.invalidateQueries({ queryKey: ['pending-submissions'] });
       toast({
-        title: 'Success',
-        description: 'Exam submitted successfully'
+        title: 'Submitted',
+        description: 'Your exam was submitted and is awaiting teacher grading.'
       });
     },
     onError: (error) => {

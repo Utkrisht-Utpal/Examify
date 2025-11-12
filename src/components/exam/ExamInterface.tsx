@@ -160,44 +160,25 @@ export const ExamInterface = ({ examId, onSubmitExam, onExitExam }: ExamInterfac
       console.log('Submission created successfully:', submission);
       console.log('Submission answers field:', submission.answers);
       
-      // Save results
-      const { data: resultData, error: resultError } = await supabase
-        .from('results')
-        .insert({
-          submission_id: submission.id,
-          exam_id: examId,
-          student_id: user.id,
-          score: results.totalScore,
-          total_marks: results.maxScore,
-          percentage: results.percentage
-        })
-        .select()
-        .single();
-
-      if (resultError) {
-        console.error('Result error:', resultError);
-        throw resultError;
-      }
-      
-      console.log('Result created:', resultData);
-
-      // Invalidate queries with exact keys to refresh dashboard data
+      // Do NOT create a result here. Results are created/updated only by teachers during grading.
+      // Invalidate queries to refresh teacher and student views
       console.log('Invalidating queries for userId:', user.id);
-      await queryClient.invalidateQueries({ queryKey: ['results', user.id] });
       await queryClient.invalidateQueries({ queryKey: ['submissions', examId] });
       await queryClient.invalidateQueries({ queryKey: ['submittedExams', user.id] });
+      await queryClient.invalidateQueries({ queryKey: ['pending-submissions'] });
       
-      // Force refetch to ensure fresh data
-      await queryClient.refetchQueries({ queryKey: ['results', user.id] });
+      // Force refetch to ensure fresh data where appropriate
       await queryClient.refetchQueries({ queryKey: ['submittedExams', user.id] });
       
       console.log('=== EXAM SUBMISSION COMPLETE ===');
 
       toast({
-        title: "Exam Submitted Successfully!",
-        description: `Score: ${results.totalScore}/${results.maxScore} (${results.percentage}%)`
+        title: "Exam submitted!",
+        description: "Your answers were saved. A teacher will review and grade your submission."
       });
 
+      // Pass back the local calculation if the caller wants to show a provisional summary,
+      // but it is NOT persisted and not the final grade.
       onSubmitExam(results);
   } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Failed to submit exam";
