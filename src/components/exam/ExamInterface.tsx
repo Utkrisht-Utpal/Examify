@@ -104,36 +104,35 @@ export const ExamInterface = ({ examId, onSubmitExam, onExitExam }: ExamInterfac
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      // Calculate results
+      // For students, correct answers may be sanitized away via RLS.
+      // Avoid auto-scoring if correct_answer is not available.
+      const maxScore = examData?.total_marks || 0;
       let totalScore = 0;
       let correctAnswers = 0;
-      const maxScore = examData?.total_marks || 0;
+      const anyMissingCorrect = examData?.questions?.some((q: any) => q.correct_answer === undefined || q.correct_answer === null);
 
-      examData?.questions?.forEach((question) => {
-        const userAnswer = answers[question.id];
-        if (!userAnswer) return;
-
-        if (question.question_type === "mcq") {
-          if (userAnswer === question.correct_answer) {
-            totalScore += question.points;
-            correctAnswers++;
+      if (!anyMissingCorrect) {
+        examData?.questions?.forEach((question: any) => {
+          const userAnswer = answers[question.id];
+          if (!userAnswer) return;
+          if (question.question_type === "mcq") {
+            if (userAnswer === question.correct_answer) {
+              totalScore += question.points;
+              correctAnswers++;
+            }
+          } else {
+            // Optional heuristic for descriptive, but teacher will finalize grading anyway
+            // Keep at zero to avoid misleading results
           }
-        } else {
-          if (userAnswer.length > 50) {
-            totalScore += Math.floor(question.points * 0.75);
-            correctAnswers++;
-          } else if (userAnswer.length > 20) {
-            totalScore += Math.floor(question.points * 0.5);
-          }
-        }
-      });
+        });
+      }
 
       const results = {
         totalScore,
         maxScore,
         correctAnswers,
-        incorrectAnswers: (examData?.questions?.length || 0) - correctAnswers,
-        percentage: Math.round((totalScore / maxScore) * 100),
+        incorrectAnswers: anyMissingCorrect ? 0 : (examData?.questions?.length || 0) - correctAnswers,
+        percentage: maxScore > 0 ? Math.round((totalScore / maxScore) * 100) : 0,
         answers
       };
 

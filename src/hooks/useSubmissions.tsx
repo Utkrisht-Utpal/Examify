@@ -13,7 +13,7 @@ export const useSubmissions = (examId?: string) => {
       if (examId) {
         const { data, error } = await supabase
           .from('submissions')
-        .select('*, exams(title, subject), profiles(full_name, email)')
+          .select('*, exams(title, subject), profiles:profiles!submissions_student_id_fkey(full_name, email)')
           .eq('exam_id', examId)
           .order('submitted_at', { ascending: false });
         if (error) throw error;
@@ -34,7 +34,7 @@ export const useSubmissions = (examId?: string) => {
       const examIds = teacherExams.map(e => e.id);
       const { data, error } = await supabase
         .from('submissions')
-        .select('*, exams(title, subject), profiles(full_name, email)')
+        .select('*, exams(title, subject), profiles:profiles!submissions_student_id_fkey(full_name, email)')
         .in('exam_id', examIds)
         .order('submitted_at', { ascending: false });
       if (error) throw error;
