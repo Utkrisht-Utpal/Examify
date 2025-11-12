@@ -187,19 +187,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     (async () => {
       try {
         console.log('Checking for existing session on mount...');
-        const { data: { session } } = await supabase.auth.getSession();
-        console.log('Session check result:', !!session);
         
-        // Load session with a timeout to prevent hanging
-        const loadPromise = loadUserSession(session);
-        const timeoutPromise = new Promise((resolve) => {
-          setTimeout(() => {
-            console.warn('loadUserSession timed out after 4s');
-            resolve(null);
-          }, 4000);
-        });
+        // Debug: Check what's in localStorage
+        const lsKeys = Object.keys(localStorage);
+        console.log('localStorage keys:', lsKeys);
+        const authKeys = lsKeys.filter(k => k.includes('sb') || k.includes('supabase') || k.includes('auth'));
+        console.log('Auth-related keys:', authKeys);
         
-        await Promise.race([loadPromise, timeoutPromise]);
+        const { data: { session }, error } = await supabase.auth.getSession();
+        console.log('Session check result:', !!session, 'Error:', error);
+        if (session) {
+          console.log('Session user:', session.user?.email, 'Role:', session.user?.user_metadata?.role);
+        }
+        
+        await loadUserSession(session);
         console.log('Session initialization complete');
       } catch (error) {
         console.error('Error checking session:', error);
