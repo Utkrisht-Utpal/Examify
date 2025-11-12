@@ -122,6 +122,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return () => subscription.unsubscribe();
   }, []);
 
+  // Fallback: never keep the app in loading state indefinitely (e.g., slow network)
+  useEffect(() => {
+    if (!loading) return;
+    const id = setTimeout(() => setLoading(false), 3000);
+    return () => clearTimeout(id);
+  }, [loading]);
+
   const signUp = async (email: string, password: string, fullName: string, role: string) => {
     // Remember selected role; it will be applied on first authenticated session after email confirmation
     try { localStorage.setItem('pendingRole', role); } catch {}
