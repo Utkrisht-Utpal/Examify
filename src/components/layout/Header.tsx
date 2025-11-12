@@ -23,6 +23,12 @@ export const Header = ({ user, onLogout }: HeaderProps) => {
     return variants[role as keyof typeof variants] || "bg-muted text-muted-foreground";
   };
 
+  const handleLogoutClick: React.MouseEventHandler<HTMLButtonElement> = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onLogout();
+  };
+
   return (
     <header className="border-b bg-card">
       <div className="flex h-16 items-center justify-between px-6">
@@ -38,7 +44,7 @@ export const Header = ({ user, onLogout }: HeaderProps) => {
         <div className="flex items-center gap-4">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" aria-label="Notifications">
+              <Button variant="outline" size="sm" aria-label="Notifications" type="button">
                 <Bell className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
@@ -67,7 +73,7 @@ export const Header = ({ user, onLogout }: HeaderProps) => {
             </Avatar>
           </div>
 
-          <Button variant="outline" size="sm" onClick={onLogout}>
+          <Button variant="outline" size="sm" type="button" onClick={handleLogoutClick}>
             <LogOut className="h-4 w-4" />
             Logout
           </Button>
