@@ -314,7 +314,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setUser(null);
       setSession(null);
       setLoading(false);
-      // Let the caller handle navigation; avoid forcing a full reload which can cause bounce loops
+      // As requested: ensure all origin storage is cleared and force a clean navigation to /login
+      try { localStorage.clear(); } catch {}
+      try { sessionStorage.clear(); } catch {}
+      try {
+        // Replace current URL to avoid back-button returning to an authed route
+        window.history.replaceState(null, '', '/login');
+        // Ensure the SPA loads the login route (no full hard reload needed)
+        window.location.replace('/login');
+      } catch {}
     }
   };
 
