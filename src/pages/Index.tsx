@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import Auth from "./Auth";
+import { useNavigate } from "react-router-dom";
 import { Header } from "@/components/layout/Header";
 import { StudentDashboard } from "@/components/dashboard/StudentDashboard";
 import { TeacherDashboard } from "@/components/dashboard/TeacherDashboard";
@@ -20,6 +20,7 @@ interface User {
 
 const Index = () => {
   const { user: authUser, signOut, signIn, signUp, loading, effectiveRole: role } = useAuth();
+  const navigate = useNavigate();
   type ViewType = "dashboard" | "exam" | "results" | "create-exam" | "view-exam" | "grading";
   interface ExamResults {
     totalScore: number;
@@ -48,6 +49,8 @@ const Index = () => {
         title: "Logged Out",
         description: "You have been successfully logged out.",
       });
+      // Route to login using the client router to avoid reload loops
+      navigate('/login', { replace: true });
     }
   };
 
@@ -123,8 +126,16 @@ const Index = () => {
     );
   }
 
+  // If unauthenticated on the root route, redirect to /login to avoid bouncing between dashboard and auth
+  useEffect(() => {
+    if (!loading && !authUser) {
+      navigate('/login', { replace: true });
+    }
+  }, [loading, authUser, navigate]);
+
   if (!authUser) {
-    return <Auth signIn={signIn} signUp={signUp} />;
+    // Render nothing while redirecting
+    return null;
   }
 
   // Get user profile data
@@ -138,9 +149,6 @@ const Index = () => {
         </div>
       </div>
     );
-  }
-  if (!authUser) {
-    return <Auth signIn={signIn} signUp={signUp} />;
   }
   const finalRole = role || (authUser.user_metadata?.role as 'student' | 'teacher' | undefined) || 'student';
 

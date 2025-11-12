@@ -291,6 +291,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       // 3) Clear storage keys we control/recognize
       clearAuthStorage();
 
+      // 3.5) Drop realtime subscriptions to avoid any reconnections holding state
+      try { supabase.removeAllChannels(); } catch {}
+
       // 4) Verify session is gone; retry a couple times, else last-resort clear storages
       for (let i = 0; i < 3; i++) {
         const { data } = await supabase.auth.getSession();
@@ -311,13 +314,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setUser(null);
       setSession(null);
       setLoading(false);
-      // Navigate to root without risking SPA interception; then hard reload
-      try {
-        window.location.replace('/login');
-      } catch {}
-      try {
-        setTimeout(() => { try { window.location.reload(); } catch {} }, 50);
-      } catch {}
+      // Let the caller handle navigation; avoid forcing a full reload which can cause bounce loops
     }
   };
 
