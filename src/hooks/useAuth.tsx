@@ -313,7 +313,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setLoading(false);
       // Navigate to root without risking SPA interception; then hard reload
       try {
-        window.location.replace('/');
+        window.location.replace('/login');
       } catch {}
       try {
         setTimeout(() => { try { window.location.reload(); } catch {} }, 50);
