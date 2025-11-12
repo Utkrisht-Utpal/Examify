@@ -78,7 +78,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         }
       }
     );
-    );
 
     // Check for existing session on mount (network-safe)
     (async () => {
