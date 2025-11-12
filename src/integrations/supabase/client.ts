@@ -5,13 +5,35 @@ import type { Database } from './types';
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
+// Debug: Check localStorage availability
+try {
+  const testKey = '__localStorage_test__';
+  window.localStorage.setItem(testKey, 'test');
+  window.localStorage.removeItem(testKey);
+  console.log('✓ localStorage is available');
+} catch (e) {
+  console.error('❌ localStorage is NOT available:', e);
+}
+
+// Debug: Verify env vars are loaded
+if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
+  console.error('❌ Supabase env vars missing!', {
+    hasUrl: !!SUPABASE_URL,
+    hasKey: !!SUPABASE_PUBLISHABLE_KEY
+  });
+} else {
+  console.log('✓ Supabase client initializing with URL:', SUPABASE_URL);
+}
+
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
-    storage: localStorage,
+    storage: window.localStorage,
     persistSession: true,
     autoRefreshToken: true,
+    detectSessionInUrl: true,
+    storageKey: 'sb-auth-token',
   }
 });

@@ -326,6 +326,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
     setLoading(false);
     console.log('Sign in successful:', data.user?.email);
+    
+    // Debug: Check if auth tokens are stored in localStorage
+    setTimeout(() => {
+      const storageKeys = Object.keys(localStorage);
+      const authKeys = storageKeys.filter(k => k.includes('sb') || k.includes('supabase'));
+      console.log('✓ localStorage auth keys after sign in:', authKeys);
+      if (authKeys.length === 0) {
+        console.error('❌ NO auth tokens found in localStorage!');
+      }
+    }, 100);
   };
 
   const signOut = async () => {
