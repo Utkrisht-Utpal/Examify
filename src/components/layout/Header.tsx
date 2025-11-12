@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { BookOpen, LogOut, Bell } from "lucide-react";
 
 interface HeaderProps {
@@ -35,9 +36,20 @@ export const Header = ({ user, onLogout }: HeaderProps) => {
         </div>
 
         <div className="flex items-center gap-4">
-          <Button variant="outline" size="sm">
-            <Bell className="h-4 w-4" />
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" aria-label="Notifications">
+                <Bell className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-64">
+              <DropdownMenuLabel>Notifications</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem disabled>
+                <span className="text-muted-foreground">No notifications</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           
           <div className="flex items-center gap-3">
             <div className="text-right">
