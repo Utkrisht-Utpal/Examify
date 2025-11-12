@@ -84,7 +84,7 @@ export const TeacherDashboard = ({ user, onCreateExam, onViewResults, onViewExam
   
   const recentActivity = submissions?.slice(0, 4).map(sub => ({
     type: "submission",
-    student: sub.profiles?.full_name || 'Unknown',
+    student: sub.profiles?.full_name || sub.profiles?.email || 'Unknown',
     exam: sub.exams?.title || 'Unknown',
     time: new Date(sub.submitted_at).toLocaleString()
   })) || [];
