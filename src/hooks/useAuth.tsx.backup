@@ -187,20 +187,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     (async () => {
       try {
         console.log('Checking for existing session on mount...');
+        const { data: { session } } = await supabase.auth.getSession();
+        console.log('Session check result:', !!session);
         
-        // Debug: Check what's in localStorage
-        const lsKeys = Object.keys(localStorage);
-        console.log('localStorage keys:', lsKeys);
-        const authKeys = lsKeys.filter(k => k.includes('sb') || k.includes('supabase') || k.includes('auth'));
-        console.log('Auth-related keys:', authKeys);
+        // Load session with a timeout to prevent hanging
+        const loadPromise = loadUserSession(session);
+        const timeoutPromise = new Promise((resolve) => {
+          setTimeout(() => {
+            console.warn('loadUserSession timed out after 4s');
+            resolve(null);
+          }, 4000);
+        });
         
-        const { data: { session }, error } = await supabase.auth.getSession();
-        console.log('Session check result:', !!session, 'Error:', error);
-        if (session) {
-          console.log('Session user:', session.user?.email, 'Role:', session.user?.user_metadata?.role);
-        }
-        
-        await loadUserSession(session);
+        await Promise.race([loadPromise, timeoutPromise]);
         console.log('Session initialization complete');
       } catch (error) {
         console.error('Error checking session:', error);
@@ -263,6 +262,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     };
   }, []);
 
+  // Fallback: never keep the app in loading state indefinitely (e.g., slow network)
+  useEffect(() => {
+    if (!loading) return;
+    const id = setTimeout(() => {
+      console.warn('Auth loading timeout reached (5s) - forcing loading to false');
+      setLoading(false);
+      // If we have a session but no role, use fallback
+      if (session?.user && !effectiveRole) {
+        const fallback = (session.user.user_metadata as { role?: string })?.role || 'student';
+        setEffectiveRole(fallback as 'student' | 'teacher');
+        console.warn('Applied fallback role due to timeout:', fallback);
+      }
+    }, 5000);
+    return () => clearTimeout(id);
+  }, [loading, session, effectiveRole]);
 
   const signUp = async (email: string, password: string, fullName: string, role: string) => {
     try { localStorage.setItem(`accountRole:${email.toLowerCase()}`, role); } catch (e) { /* ignore cache write */ }
@@ -327,16 +341,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
     setLoading(false);
     console.log('Sign in successful:', data.user?.email);
-    
-    // Debug: Check if auth tokens are stored in localStorage
-    setTimeout(() => {
-      const storageKeys = Object.keys(localStorage);
-      const authKeys = storageKeys.filter(k => k.includes('sb') || k.includes('supabase'));
-      console.log('✓ localStorage auth keys after sign in:', authKeys);
-      if (authKeys.length === 0) {
-        console.error('❌ NO auth tokens found in localStorage!');
-      }
-    }, 100);
   };
 
   const signOut = async () => {
