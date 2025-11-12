@@ -128,8 +128,8 @@ const Index = () => {
   }
 
   // Get user profile data
-  // Use the effectiveRole computed by the auth provider to avoid dashboard flicker
-  if (!role) {
+  // Use the effectiveRole. While loading (on first paint), show a tiny check spinner; otherwise default to 'student'.
+  if (loading && !role) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -139,11 +139,12 @@ const Index = () => {
       </div>
     );
   }
+  const finalRole = role || 'student';
 
   const user: User = {
     name: authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || 'User',
     email: authUser.email || '',
-    role: role,
+    role: finalRole,
   };
 
   if (currentView === "exam" && currentExamId) {
@@ -208,7 +209,7 @@ const Index = () => {
       <Header user={user} onLogout={handleLogout} />
       
       <main>
-        {role === "student" && (
+        {finalRole === "student" && (
           <StudentDashboard
             key={currentView} 
             user={user}
@@ -217,7 +218,7 @@ const Index = () => {
           />
         )}
         
-        {role === "teacher" && (
+        {finalRole === "teacher" && (
           <TeacherDashboard 
             user={user}
             onCreateExam={handleCreateExam}

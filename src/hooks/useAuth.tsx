@@ -67,7 +67,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               setRoles(roleList);
             } catch {}
             const metaRole = (session.user.user_metadata as any)?.role;
-            const derived: 'student' | 'teacher' | null = metaRole === 'teacher' ? 'teacher' : metaRole === 'student' ? 'student' : (roleList.includes('teacher') ? 'teacher' : (roleList.includes('student') ? 'student' : null));
+            const derived: 'student' | 'teacher' = metaRole === 'teacher' ? 'teacher' : metaRole === 'student' ? 'student' : (roleList.includes('teacher') ? 'teacher' : 'student');
             setEffectiveRole(derived);
           } else {
             setRoles([]);
@@ -97,7 +97,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             const roleList = (rolesData || []).map(r => r.role);
             setRoles(roleList);
             const metaRole = (session.user.user_metadata as any)?.role;
-            const derived: 'student' | 'teacher' | null = metaRole === 'teacher' ? 'teacher' : metaRole === 'student' ? 'student' : (roleList.includes('teacher') ? 'teacher' : (roleList.includes('student') ? 'student' : null));
+            const derived: 'student' | 'teacher' = metaRole === 'teacher' ? 'teacher' : metaRole === 'student' ? 'student' : (roleList.includes('teacher') ? 'teacher' : 'student');
             setEffectiveRole(derived);
           } catch {}
         } else {
@@ -162,7 +162,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setRoles(roleList);
     } catch {}
     const metaRole = data.user?.user_metadata?.role as string | undefined;
-    const derived: 'student' | 'teacher' | null = metaRole === 'teacher' ? 'teacher' : metaRole === 'student' ? 'student' : (roleList.includes('teacher') ? 'teacher' : (roleList.includes('student') ? 'student' : null));
+    const derived: 'student' | 'teacher' = metaRole === 'teacher' ? 'teacher' : metaRole === 'student' ? 'student' : (roleList.includes('teacher') ? 'teacher' : 'student');
     setEffectiveRole(derived);
     setLoading(false);
     console.log('Sign in successful:', data.user?.email);
