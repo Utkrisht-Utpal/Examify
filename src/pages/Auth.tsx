@@ -5,7 +5,7 @@ import { BookOpen, GraduationCap, Shield, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface AuthProps {
-  signIn: (email: string, password: string) => Promise<void>;
+  signIn: (email: string, password: string, role?: 'student' | 'teacher') => Promise<void>;
   signUp: (email: string, password: string, fullName: string, role: string) => Promise<void>;
 }
 
@@ -13,9 +13,9 @@ const Auth = ({ signIn, signUp }: AuthProps) => {
   const [isLogin, setIsLogin] = useState(true);
   const { toast } = useToast();
 
-  const handleLogin = async (email: string, password: string) => {
+  const handleLogin = async (email: string, password: string, role: 'student' | 'teacher') => {
     try {
-      await signIn(email, password);
+      await signIn(email, password, role);
       toast({
         title: "Login Successful",
         description: `Welcome back!`,

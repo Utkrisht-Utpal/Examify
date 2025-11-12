@@ -128,16 +128,10 @@ const Index = () => {
   }
 
   // Get user profile data
-  // Determine role with precedence and local pendingRole hint
+  // Determine role strictly from DB roles
   let computedRole = 'student';
-  try {
-    const pending = localStorage.getItem('pendingRole');
-    if (pending === 'teacher' || pending === 'student') {
-      computedRole = pending;
-    }
-  } catch {}
   if (roles?.includes('teacher')) computedRole = 'teacher';
-  else if (roles?.includes('student')) computedRole = computedRole || 'student';
+  else if (roles?.includes('student')) computedRole = 'student';
   else if (roles?.length) computedRole = roles[0];
 
   const user: User = {

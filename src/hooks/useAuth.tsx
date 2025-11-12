@@ -145,19 +145,38 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     // No immediate sign-in; user will confirm email then sign in. Role is applied in onAuthStateChange.
   };
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (email: string, password: string, expectedRole?: 'student' | 'teacher') => {
     console.log('Attempting sign in with email:', email);
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
     if (error) {
       console.error('Sign in error:', error);
       throw error;
     }
-    
-    console.log('Sign in successful:', data.user?.email);
+
+    const userId = data.user?.id;
+    if (!userId) return;
+
+    // Fetch roles from DB and enforce expected role if provided
+    const { data: rolesData, error: rolesError } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userId);
+
+    if (rolesError) throw rolesError;
+    const roleList = rolesData?.map(r => r.role) || [];
+    setRoles(roleList);
+
+    if (expectedRole && !roleList.includes(expectedRole)) {
+      // Role mismatch: sign out to prevent wrong dashboard access
+      await supabase.auth.signOut();
+      setUser(null);
+      setSession(null);
+      setRoles([]);
+      throw new Error(`This account is not registered as ${expectedRole}.`);
+    }
+
+    console.log('Sign in successful:', data.user?.email, 'roles:', roleList);
   };
 
   const signOut = async () => {
