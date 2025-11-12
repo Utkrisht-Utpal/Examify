@@ -6,6 +6,7 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   roles: string[];
+  effectiveRole: 'student' | 'teacher' | null;
   loading: boolean;
   signUp: (email: string, password: string, fullName: string, role: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
@@ -18,6 +19,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [roles, setRoles] = useState<string[]>([]);
+  const [effectiveRole, setEffectiveRole] = useState<'student' | 'teacher' | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Ensure a profile row and default role exist for the authenticated user
@@ -46,34 +48,42 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
         try {
+          setLoading(true);
           setSession(session);
           setUser(session?.user ?? null);
           
           if (session?.user) {
-          // Ensure profile row exists
+            // Ensure profile row exists
             await ensureProfile(session.user.id, session.user.email, (session.user.user_metadata as any)?.full_name);
   
-  
-            // Fetch user roles
+            // Fetch user roles and compute effective role (prefer metadata)
+            let roleList: string[] = [];
             try {
               const { data: rolesData } = await supabase
                 .from('user_roles')
                 .select('role')
                 .eq('user_id', session.user.id);
-              if (rolesData) setRoles(rolesData.map(r => r.role));
+              roleList = (rolesData || []).map(r => r.role);
+              setRoles(roleList);
             } catch {}
+            const metaRole = (session.user.user_metadata as any)?.role;
+            const derived: 'student' | 'teacher' | null = metaRole === 'teacher' ? 'teacher' : metaRole === 'student' ? 'student' : (roleList.includes('teacher') ? 'teacher' : (roleList.includes('student') ? 'student' : null));
+            setEffectiveRole(derived);
           } else {
             setRoles([]);
+            setEffectiveRole(null);
           }
         } finally {
           setLoading(false);
         }
       }
     );
+    );
 
     // Check for existing session on mount (network-safe)
     (async () => {
       try {
+        setLoading(true);
         const { data: { session } } = await supabase.auth.getSession();
         setSession(session);
         setUser(session?.user ?? null);
@@ -85,8 +95,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               .from('user_roles')
               .select('role')
               .eq('user_id', session.user.id);
-            if (rolesData) setRoles(rolesData.map(r => r.role));
+            const roleList = (rolesData || []).map(r => r.role);
+            setRoles(roleList);
+            const metaRole = (session.user.user_metadata as any)?.role;
+            const derived: 'student' | 'teacher' | null = metaRole === 'teacher' ? 'teacher' : metaRole === 'student' ? 'student' : (roleList.includes('teacher') ? 'teacher' : (roleList.includes('student') ? 'student' : null));
+            setEffectiveRole(derived);
           } catch {}
+        } else {
+          setEffectiveRole(null);
         }
       } finally {
         setLoading(false);
@@ -124,33 +140,42 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signIn = async (email: string, password: string) => {
     console.log('Attempting sign in with email:', email);
+    setLoading(true);
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
     if (error) {
       console.error('Sign in error:', error);
+      setLoading(false);
       throw error;
     }
 
     const userId = data.user?.id;
-    if (!userId) return;
+    if (!userId) { setLoading(false); return; }
 
-    // Roles are optional now; role is primarily stored in auth user metadata
+    // Fetch roles to compute effective role alongside metadata
+    let roleList: string[] = [];
     try {
       const { data: rolesData } = await supabase
         .from('user_roles')
         .select('role')
         .eq('user_id', userId);
-      setRoles((rolesData || []).map(r => r.role));
+      roleList = (rolesData || []).map(r => r.role);
+      setRoles(roleList);
     } catch {}
-
+    const metaRole = data.user?.user_metadata?.role as string | undefined;
+    const derived: 'student' | 'teacher' | null = metaRole === 'teacher' ? 'teacher' : metaRole === 'student' ? 'student' : (roleList.includes('teacher') ? 'teacher' : (roleList.includes('student') ? 'student' : null));
+    setEffectiveRole(derived);
+    setLoading(false);
     console.log('Sign in successful:', data.user?.email);
   };
 
   const signOut = async () => {
     try {
+      setLoading(true);
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
       setRoles([]);
+      setEffectiveRole(null);
       setUser(null);
       setSession(null);
     } finally {
@@ -159,7 +184,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, roles, loading, signUp, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, session, roles, effectiveRole, loading, signUp, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );

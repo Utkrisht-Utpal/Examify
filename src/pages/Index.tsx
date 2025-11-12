@@ -19,7 +19,7 @@ interface User {
 }
 
 const Index = () => {
-  const { user: authUser, signOut, signIn, signUp, loading, roles } = useAuth();
+  const { user: authUser, signOut, signIn, signUp, loading, effectiveRole: role } = useAuth();
   type ViewType = "dashboard" | "exam" | "results" | "create-exam" | "view-exam" | "grading";
   interface ExamResults {
     totalScore: number;
@@ -128,20 +128,22 @@ const Index = () => {
   }
 
   // Get user profile data
-  // Determine role from auth user metadata first; fall back to DB roles, then 'student'
-  const metaRole = (authUser.user_metadata?.role as string | undefined);
-  let computedRole = metaRole === 'teacher' || metaRole === 'student' ? metaRole : undefined;
-  if (!computedRole) {
-    if (roles?.includes('teacher')) computedRole = 'teacher';
-    else if (roles?.includes('student')) computedRole = 'student';
-    else if (roles?.length) computedRole = roles[0];
-    else computedRole = 'student';
+  // Use the effectiveRole computed by the auth provider to avoid dashboard flicker
+  if (!role) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Checking your account...</p>
+        </div>
+      </div>
+    );
   }
 
   const user: User = {
     name: authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || 'User',
     email: authUser.email || '',
-    role: computedRole,
+    role: role,
   };
 
   if (currentView === "exam" && currentExamId) {
@@ -206,7 +208,7 @@ const Index = () => {
       <Header user={user} onLogout={handleLogout} />
       
       <main>
-        {user.role === "student" && (
+        {role === "student" && (
           <StudentDashboard
             key={currentView} 
             user={user}
@@ -215,7 +217,7 @@ const Index = () => {
           />
         )}
         
-        {user.role === "teacher" && (
+        {role === "teacher" && (
           <TeacherDashboard 
             user={user}
             onCreateExam={handleCreateExam}
