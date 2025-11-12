@@ -40,8 +40,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         .from('user_roles')
         .select('role')
         .eq('user_id', uid);
-      if (!rolesExisting || rolesExisting.length === 0) {
-        // Default everyone to student until explicitly granted teacher/admin
+
+      // If no roles yet, only auto-assign student when there is no pending role hint.
+      let pendingRole: string | null = null;
+      try { pendingRole = localStorage.getItem('pendingRole'); } catch {}
+
+      if ((!rolesExisting || rolesExisting.length === 0) && !pendingRole) {
         await supabase.from('user_roles').insert({ user_id: uid, role: 'student' });
       }
     } catch (e) {

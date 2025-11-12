@@ -37,13 +37,18 @@ const Index = () => {
   const { toast } = useToast();
 
   const handleLogout = async () => {
-    await signOut();
-    setCurrentView("dashboard");
-    setCurrentExamId(null);
-    toast({
-      title: "Logged Out",
-      description: "You have been successfully logged out.",
-    });
+    try {
+      await signOut();
+    } catch (e) {
+      // ignore signout errors; proceed to client reset
+    } finally {
+      setCurrentView("dashboard");
+      setCurrentExamId(null);
+      toast({
+        title: "Logged Out",
+        description: "You have been successfully logged out.",
+      });
+    }
   };
 
   const handleStartExam = (examId: string) => {
@@ -123,10 +128,22 @@ const Index = () => {
   }
 
   // Get user profile data
+  // Determine role with precedence and local pendingRole hint
+  let computedRole = 'student';
+  try {
+    const pending = localStorage.getItem('pendingRole');
+    if (pending === 'teacher' || pending === 'student') {
+      computedRole = pending;
+    }
+  } catch {}
+  if (roles?.includes('teacher')) computedRole = 'teacher';
+  else if (roles?.includes('student')) computedRole = computedRole || 'student';
+  else if (roles?.length) computedRole = roles[0];
+
   const user: User = {
     name: authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || 'User',
     email: authUser.email || '',
-    role: roles[0] || 'student', // Get the first role
+    role: computedRole,
   };
 
   if (currentView === "exam" && currentExamId) {
