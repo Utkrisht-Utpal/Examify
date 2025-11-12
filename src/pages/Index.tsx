@@ -128,8 +128,8 @@ const Index = () => {
   }
 
   // Get user profile data
-  // Use the effectiveRole. While loading (on first paint), show a tiny check spinner; otherwise default to 'student'.
-  if (loading && !role) {
+  // Use the effectiveRole. While loading (on first paint), show a tiny check spinner; otherwise require an auth user.
+  if (loading && authUser && !role) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -139,7 +139,10 @@ const Index = () => {
       </div>
     );
   }
-  const finalRole = role || 'student';
+  if (!authUser) {
+    return <Auth signIn={signIn} signUp={signUp} />;
+  }
+  const finalRole = role || (authUser.user_metadata?.role as 'student' | 'teacher' | undefined) || 'student';
 
   const user: User = {
     name: authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || 'User',

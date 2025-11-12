@@ -60,7 +60,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return 'student';
   };
 
-  // Persist role back to auth metadata if missing
+  // Persist role back to auth metadata if needed
   const persistRoleToMetadataIfNeeded = async (currentMeta: any, email: string | null | undefined, role: 'student' | 'teacher') => {
     try {
       const m = typeof currentMeta === 'string' ? currentMeta : undefined;
@@ -73,6 +73,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     } catch (e) {
       // non-fatal
       console.warn('persistRoleToMetadataIfNeeded warning:', e);
+    }
+  };
+
+  // Best-effort: ensure a user_roles row exists for analytics and DB queries
+  const tryEnsureUserRole = async (userId: string, role: 'student' | 'teacher') => {
+    try {
+      const { data: existing } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', userId);
+      if (!existing || existing.length === 0) {
+        await supabase.from('user_roles').insert({ user_id: userId, role }).select().single();
+      }
+    } catch (e) {
+      // Ignore if RLS disallows inserts; metadata role continues to be the source of truth
+      console.warn('tryEnsureUserRole warning:', e);
     }
   };
 
@@ -103,6 +119,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             const derived = deriveRole(metaRole, roleList, session.user.email);
             setEffectiveRole(prev => (prev === 'teacher' ? 'teacher' : derived));
             await persistRoleToMetadataIfNeeded(metaRole, session.user.email, derived);
+            if (!roleList || roleList.length === 0) {
+              await tryEnsureUserRole(session.user.id, derived);
+              setRoles([derived]);
+            }
           } else {
             setRoles([]);
             setEffectiveRole(null);
@@ -134,6 +154,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             const derived = deriveRole(metaRole, roleList, session.user.email);
             setEffectiveRole(prev => (prev === 'teacher' ? 'teacher' : derived));
             await persistRoleToMetadataIfNeeded(metaRole, session.user.email, derived);
+            if (!roleList || roleList.length === 0) {
+              await tryEnsureUserRole(session.user.id, derived);
+              setRoles([derived]);
+            }
           } catch {}
         } else {
           setEffectiveRole(null);
@@ -170,6 +194,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
       throw error;
     }
+    // Best-effort: if we already have a session (email confirmation disabled), create role row
+    try {
+      const { data: s } = await supabase.auth.getSession();
+      if (s?.session?.user?.id) {
+        await supabase.from('user_roles').insert({ user_id: s.session.user.id, role }).select().single();
+      }
+    } catch {
+      // ignore - metadata role is still persisted
+    }
     // No immediate sign-in; user will confirm email then sign in. Role is applied in onAuthStateChange.
   };
 
@@ -201,6 +234,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const derived = deriveRole(metaRole, roleList, data.user?.email || null);
     setEffectiveRole(derived);
     await persistRoleToMetadataIfNeeded(metaRole, data.user?.email || null, derived);
+    if (!roleList || roleList.length === 0) {
+      await tryEnsureUserRole(userId, derived);
+      setRoles([derived]);
+    }
     setLoading(false);
     console.log('Sign in successful:', data.user?.email);
   };
@@ -235,6 +272,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setSession(null);
     } finally {
       setLoading(false);
+      try { window.location.assign('/'); } catch {}
     }
   };
 
