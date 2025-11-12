@@ -244,6 +244,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signOut = async () => {
     const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
+
     const clearAuthStorage = () => {
       // Clear Supabase tokens in localStorage/sessionStorage
       try {
@@ -276,27 +277,46 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     try {
       setLoading(true);
-      // Fast attempt: global sign-out (revokes refresh token). Fallback to local after a short timeout.
-      await Promise.race([
-        supabase.auth.signOut().catch(() => {}),
-        sleep(1500)
-      ]);
-    } catch {
-      // ignore
-    } finally {
-      // Ensure local sign-out regardless of network state
+      // 1) Global sign-out (server + local) with a reasonable timeout
+      try {
+        await Promise.race([
+          supabase.auth.signOut({ scope: 'global' } as any),
+          sleep(2500)
+        ]);
+      } catch {}
+
+      // 2) Always ensure local sign-out (memory + storage)
       try { await supabase.auth.signOut({ scope: 'local' } as any); } catch {}
+
+      // 3) Clear storage keys we control/recognize
       clearAuthStorage();
+
+      // 4) Verify session is gone; retry a couple times, else last-resort clear storages
+      for (let i = 0; i < 3; i++) {
+        const { data } = await supabase.auth.getSession();
+        if (!data.session) break;
+        await sleep(150);
+        try { await supabase.auth.signOut({ scope: 'local' } as any); } catch {}
+        clearAuthStorage();
+      }
+      const { data: finalCheck } = await supabase.auth.getSession();
+      if (finalCheck.session) {
+        // Last resort: wipe all storage for this origin (rare edge cases)
+        try { localStorage.clear(); } catch {}
+        try { sessionStorage.clear(); } catch {}
+      }
+    } finally {
       setRoles([]);
       setEffectiveRole(null);
       setUser(null);
       setSession(null);
       setLoading(false);
+      // Navigate to root without risking SPA interception; then hard reload
       try {
-        // Replace history entry to avoid back-button restoring the session
         window.location.replace('/');
-        // Fallback reload in case SPA routing intercepts
-        setTimeout(() => { try { window.location.reload(); } catch {} }, 100);
+      } catch {}
+      try {
+        setTimeout(() => { try { window.location.reload(); } catch {} }, 50);
       } catch {}
     }
   };
