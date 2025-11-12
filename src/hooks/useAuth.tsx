@@ -53,61 +53,73 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        
-        if (session?.user) {
-          // Ensure profile row exists
-          await ensureProfileAndRole(session.user.id, session.user.email, (session.user.user_metadata as any)?.full_name);
-
-          // Apply any pending role choice from registration (student/teacher)
-          try {
-            const pendingRole = localStorage.getItem('pendingRole');
-            if (pendingRole === 'student' || pendingRole === 'teacher') {
-              await supabase
-                .from('user_roles')
-                .insert({ user_id: session.user.id, role: pendingRole })
-                .select()
-                .single();
-              localStorage.removeItem('pendingRole');
+        try {
+          setSession(session);
+          setUser(session?.user ?? null);
+          
+          if (session?.user) {
+            // Ensure profile row exists
+            await ensureProfileAndRole(session.user.id, session.user.email, (session.user.user_metadata as any)?.full_name);
+  
+            // Apply any pending role choice from registration (student/teacher)
+            try {
+              const pendingRole = localStorage.getItem('pendingRole');
+              if (pendingRole === 'student' || pendingRole === 'teacher') {
+                await supabase
+                  .from('user_roles')
+                  .insert({ user_id: session.user.id, role: pendingRole })
+                  .select()
+                  .single();
+                localStorage.removeItem('pendingRole');
+              }
+            } catch {
+              // ignore
             }
-          } catch (e) {
-            // Ignore unique constraint or RLS mismatch silently
+  
+            // Fetch user roles
+            try {
+              const { data: rolesData } = await supabase
+                .from('user_roles')
+                .select('role')
+                .eq('user_id', session.user.id);
+              if (rolesData) setRoles(rolesData.map(r => r.role));
+            } catch {}
+          } else {
+            setRoles([]);
           }
-
-          // Fetch user roles
-          const { data: rolesData } = await supabase
-            .from('user_roles')
-            .select('role')
-            .eq('user_id', session.user.id);
-          if (rolesData) setRoles(rolesData.map(r => r.role));
-        } else {
-          setRoles([]);
+        } finally {
+          setLoading(false);
         }
       }
     );
 
-    // Check for existing session
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      
-      if (session?.user) {
-        await ensureProfileAndRole(session.user.id, session.user.email, (session.user.user_metadata as any)?.full_name);
-        const { data: rolesData } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', session.user.id);
-        if (rolesData) setRoles(rolesData.map(r => r.role));
+    // Check for existing session on mount (network-safe)
+    (async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        setSession(session);
+        setUser(session?.user ?? null);
+  
+        if (session?.user) {
+          try {
+            await ensureProfileAndRole(session.user.id, session.user.email, (session.user.user_metadata as any)?.full_name);
+            const { data: rolesData } = await supabase
+              .from('user_roles')
+              .select('role')
+              .eq('user_id', session.user.id);
+            if (rolesData) setRoles(rolesData.map(r => r.role));
+          } catch {}
+        }
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
-    });
+    })();
 
     return () => subscription.unsubscribe();
   }, []);
 
   const signUp = async (email: string, password: string, fullName: string, role: string) => {
-    // Remember the role the user selected so we can apply it after email confirmation/sign-in
+    // Remember selected role; it will be applied on first authenticated session after email confirmation
     try { localStorage.setItem('pendingRole', role); } catch {}
 
     const { data, error } = await supabase.auth.signUp({
@@ -115,29 +127,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       password,
       options: {
         emailRedirectTo: `${window.location.origin}/`,
-        data: {
-          full_name: fullName,
-        }
+        data: { full_name: fullName }
       }
     });
-
     if (error) throw error;
-
-    // After sign up: if a session exists (email confirmations disabled), seed profile and role now.
-    // Otherwise, onAuthStateChange will run after the user confirms email and signs in.
-    if (data.session?.user && data.user) {
-      await ensureProfileAndRole(data.user.id, data.user.email, fullName);
-      // Only allow self-assigning the 'student' role. Teacher/Admin must be granted later by an admin.
-      if (role === 'student') {
-        const { error: roleError } = await supabase
-          .from('user_roles')
-          .insert({ user_id: data.user.id, role: 'student' })
-          .select()
-          .single();
-        // Ignore conflict if role already exists
-        if (roleError && (roleError as any).code !== '23505') throw roleError;
-      }
-    }
+    // No immediate sign-in; user will confirm email then sign in. Role is applied in onAuthStateChange.
   };
 
   const signIn = async (email: string, password: string) => {
@@ -156,8 +150,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const signOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      try { localStorage.removeItem('pendingRole'); } catch {}
+      setRoles([]);
+      setUser(null);
+      setSession(null);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
