@@ -77,6 +77,7 @@ export const TeacherDashboard = ({ user, onCreateExam, onViewResults, onViewExam
 
   const teacherExams = exams?.filter(exam => exam.created_by === userId) || [];
   const teacherExamIds = teacherExams.map(e => e.id);
+  const teacherExamIdsKey = React.useMemo(() => teacherExamIds.join(','), [teacherExamIds]);
 
   // Fetch average percentage for this teacher's exams and keep it updated in realtime
   React.useEffect(() => {
@@ -114,10 +115,10 @@ export const TeacherDashboard = ({ user, onCreateExam, onViewResults, onViewExam
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [teacherExamIds.join(',')]);
+  }, [teacherExamIdsKey]);
   
   // Group submissions by exam for quick counts
-  const submissionsByExam: Record<string, number> = (submissions || []).reduce((acc: Record<string, number>, s: any) => {
+  const submissionsByExam: Record<string, number> = (submissions || []).reduce((acc: Record<string, number>, s: { exam_id: string }) => {
     const key = s.exam_id;
     acc[key] = (acc[key] || 0) + 1;
     return acc;

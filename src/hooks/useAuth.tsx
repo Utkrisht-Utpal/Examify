@@ -21,7 +21,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [roles, setRoles] = useState<string[]>([]);
   const [effectiveRole, setEffectiveRole] = useState<'student' | 'teacher' | null>(null);
   const [loading, setLoading] = useState(true);
-  const PROJECT_REF = (import.meta as any)?.env?.VITE_SUPABASE_PROJECT_ID as string | undefined;
+  const PROJECT_REF = (import.meta as unknown as { env?: Record<string, string | undefined> })?.env?.VITE_SUPABASE_PROJECT_ID;
 
   // Ensure a profile row exist for the authenticated user
   const ensureProfile = async (uid: string, email: string | null, fullName?: string | null) => {
@@ -44,7 +44,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   // Derive a stable role using metadata first, then DB roles, then cached registration choice
-  const deriveRole = (metaRole: any, dbRoles: string[] | null | undefined, email: string | null | undefined): 'student' | 'teacher' => {
+  const deriveRole = (metaRole: unknown, dbRoles: string[] | null | undefined, email: string | null | undefined): 'student' | 'teacher' => {
     const m = typeof metaRole === 'string' ? metaRole : undefined;
     if (m === 'teacher' || m === 'student') return m;
     const list = dbRoles || [];
@@ -56,19 +56,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         const cached = localStorage.getItem(`accountRole:${email.toLowerCase()}`);
         if (cached === 'teacher' || cached === 'student') return cached as 'teacher' | 'student';
       }
-    } catch {}
+    } catch (e) {
+      /* ignore cache read errors */
+    }
     return 'student';
   };
 
   // Persist role back to auth metadata if needed
-  const persistRoleToMetadataIfNeeded = async (currentMeta: any, email: string | null | undefined, role: 'student' | 'teacher') => {
+  const persistRoleToMetadataIfNeeded = async (currentMeta: unknown, email: string | null | undefined, role: 'student' | 'teacher') => {
     try {
       const m = typeof currentMeta === 'string' ? currentMeta : undefined;
       if (m !== role) {
         await supabase.auth.updateUser({ data: { role } });
       }
       if (email) {
-        try { localStorage.setItem(`accountRole:${email.toLowerCase()}`, role); } catch {}
+        try { localStorage.setItem(`accountRole:${email.toLowerCase()}`, role); } catch (e) { /* ignore cache write */ }
       }
     } catch (e) {
       // non-fatal
@@ -106,7 +108,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             try {
               setLoading(true);
               if (session?.user) {
-                await ensureProfile(session.user.id, session.user.email, (session.user.user_metadata as any)?.full_name);
+                await ensureProfile(session.user.id, session.user.email, (session.user.user_metadata as { full_name?: string })?.full_name);
                 // Fetch user roles only on sign-in
                 let roleList: string[] = [];
                 try {
@@ -116,8 +118,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                     .eq('user_id', session.user.id);
                   roleList = (rolesData || []).map(r => r.role);
                   setRoles(roleList);
-                } catch {}
-                const metaRole = (session.user.user_metadata as any)?.role;
+                } catch (e) { /* ignore role fetch errors */ }
+                const metaRole = (session.user.user_metadata as { role?: string })?.role;
                 const derived = deriveRole(metaRole, roleList, session.user.email);
                 setEffectiveRole(prev => (prev === 'teacher' ? 'teacher' : derived));
                 await persistRoleToMetadataIfNeeded(metaRole, session.user.email, derived);
@@ -161,14 +163,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   
         if (session?.user) {
           try {
-            await ensureProfile(session.user.id, session.user.email, (session.user.user_metadata as any)?.full_name);
+            await ensureProfile(session.user.id, session.user.email, (session.user.user_metadata as { full_name?: string })?.full_name);
             const { data: rolesData } = await supabase
               .from('user_roles')
               .select('role')
               .eq('user_id', session.user.id);
             const roleList = (rolesData || []).map(r => r.role);
             setRoles(roleList);
-            const metaRole = (session.user.user_metadata as any)?.role;
+            const metaRole = (session.user.user_metadata as { role?: string })?.role;
             const derived = deriveRole(metaRole, roleList, session.user.email);
             setEffectiveRole(prev => (prev === 'teacher' ? 'teacher' : derived));
             await persistRoleToMetadataIfNeeded(metaRole, session.user.email, derived);
@@ -176,7 +178,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               await tryEnsureUserRole(session.user.id, derived);
               setRoles([derived]);
             }
-          } catch {}
+          } catch (e) { /* ignore ensureProfile/role fetch errors on mount */ }
         } else {
           setEffectiveRole(null);
         }
@@ -196,7 +198,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, [loading]);
 
   const signUp = async (email: string, password: string, fullName: string, role: string) => {
-    try { localStorage.setItem(`accountRole:${email.toLowerCase()}`, role); } catch {}
+    try { localStorage.setItem(`accountRole:${email.toLowerCase()}`, role); } catch (e) { /* ignore cache write */ }
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -218,7 +220,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (s?.session?.user?.id) {
         await supabase.from('user_roles').insert({ user_id: s.session.user.id, role }).select().single();
       }
-    } catch {
+    } catch (e) {
       // ignore - metadata role is still persisted
     }
     // No immediate sign-in; user will confirm email then sign in. Role is applied in onAuthStateChange.
@@ -247,7 +249,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         .eq('user_id', userId);
       roleList = (rolesData || []).map(r => r.role);
       setRoles(roleList);
-    } catch {}
+    } catch (e) { /* ignore role fetch errors */ }
     const metaRole = data.user?.user_metadata?.role as string | undefined;
     const derived = deriveRole(metaRole, roleList, data.user?.email || null);
     setEffectiveRole(derived);
@@ -273,7 +275,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           if (isThisProject || isAuthToken) keys.push(k);
         }
         keys.forEach(k => localStorage.removeItem(k));
-      } catch {}
+      } catch (e) { /* ignore localStorage iteration errors */ }
       try {
         const sKeys: string[] = [];
         for (let i = 0; i < sessionStorage.length; i++) {
@@ -284,10 +286,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           if (isThisProject || isAuthToken) sKeys.push(k);
         }
         sKeys.forEach(k => sessionStorage.removeItem(k));
-      } catch {}
+      } catch (e) { /* ignore sessionStorage iteration errors */ }
       try {
         if (user?.email) localStorage.removeItem(`accountRole:${user.email.toLowerCase()}`);
-      } catch {}
+      } catch (e) { /* ignore cache delete */ }
     };
 
     // Unregister all service workers to prevent cached dashboard HTML
@@ -297,15 +299,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           const registrations = await navigator.serviceWorker.getRegistrations();
           await Promise.all(registrations.map(reg => reg.unregister()));
         }
-      } catch {}
+      } catch (e) { /* ignore service worker errors */ }
     };
 
     setLoading(true);
     try {
       // Server-side sign out for current device/session
-      try { await supabase.auth.signOut(); } catch {}
+      try { await supabase.auth.signOut(); } catch (e) { /* ignore signOut errors */ }
       // Drop realtime channels to prevent stray reconnects
-      try { supabase.removeAllChannels(); } catch {}
+      try { supabase.removeAllChannels(); } catch (e) { /* ignore channel removal errors */ }
       // Clear local auth artifacts
       clearAuthStorage();
       // Unregister service workers

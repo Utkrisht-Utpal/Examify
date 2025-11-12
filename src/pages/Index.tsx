@@ -38,10 +38,15 @@ const Index = () => {
   const { toast } = useToast();
 
   const handleLogout = async () => {
-    // Use dedicated /logout route to perform server sign-out then redirect to /login
-    setCurrentView("dashboard");
-    setCurrentExamId(null);
-    navigate('/logout', { replace: true });
+    // Perform sign-out directly to avoid intermediate route rendering artifacts
+    try {
+      setCurrentView("dashboard");
+      setCurrentExamId(null);
+      await signOut(); // signOut will hard-redirect to /login
+    } catch (e) {
+      // As a fallback, force navigation to login
+      navigate('/login', { replace: true });
+    }
   };
 
   const handleStartExam = (examId: string) => {

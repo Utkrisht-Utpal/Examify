@@ -45,6 +45,13 @@ export const ExamInterface = ({ examId, onSubmitExam, onExitExam }: ExamInterfac
   
   console.log('ExamInterface state:', { examData, isLoading, examError });
   
+  type ScorableQuestion = {
+    id: string;
+    question_type: 'mcq' | 'descriptive';
+    correct_answer?: string | null;
+    points: number;
+  };
+
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [timeLeft, setTimeLeft] = useState(0);
@@ -109,10 +116,10 @@ export const ExamInterface = ({ examId, onSubmitExam, onExitExam }: ExamInterfac
       const maxScore = examData?.total_marks || 0;
       let totalScore = 0;
       let correctAnswers = 0;
-      const anyMissingCorrect = examData?.questions?.some((q: any) => q.correct_answer === undefined || q.correct_answer === null);
+      const anyMissingCorrect = examData?.questions?.some((q: { correct_answer?: string | null }) => q.correct_answer == null);
 
       if (!anyMissingCorrect) {
-        examData?.questions?.forEach((question: any) => {
+        examData?.questions?.forEach((question: ScorableQuestion) => {
           const userAnswer = answers[question.id];
           if (!userAnswer) return;
           if (question.question_type === "mcq") {
