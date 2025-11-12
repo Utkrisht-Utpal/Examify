@@ -126,17 +126,6 @@ const Index = () => {
     );
   }
 
-  // If unauthenticated on the root route, redirect to /login to avoid bouncing between dashboard and auth
-  useEffect(() => {
-    if (!loading && !authUser) {
-      navigate('/login', { replace: true });
-    }
-  }, [loading, authUser, navigate]);
-
-  if (!authUser) {
-    // Render nothing while redirecting
-    return null;
-  }
 
   // Get user profile data
   // Use the effectiveRole. While loading (on first paint), show a tiny check spinner; otherwise require an auth user.

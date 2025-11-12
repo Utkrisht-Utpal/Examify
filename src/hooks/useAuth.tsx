@@ -243,10 +243,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const signOut = async () => {
-    const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
-
+    // Remove known auth-related storage keys and our cached role
     const clearAuthStorage = () => {
-      // Clear Supabase tokens in localStorage/sessionStorage
       try {
         const keys: string[] = [];
         for (let i = 0; i < localStorage.length; i++) {
@@ -269,60 +267,26 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         }
         sKeys.forEach(k => sessionStorage.removeItem(k));
       } catch {}
-      // Clear our own cached role
       try {
         if (user?.email) localStorage.removeItem(`accountRole:${user.email.toLowerCase()}`);
       } catch {}
     };
 
+    setLoading(true);
     try {
-      setLoading(true);
-      // 1) Global sign-out (server + local) with a reasonable timeout
-      try {
-        await Promise.race([
-          supabase.auth.signOut({ scope: 'global' } as any),
-          sleep(2500)
-        ]);
-      } catch {}
-
-      // 2) Always ensure local sign-out (memory + storage)
-      try { await supabase.auth.signOut({ scope: 'local' } as any); } catch {}
-
-      // 3) Clear storage keys we control/recognize
-      clearAuthStorage();
-
-      // 3.5) Drop realtime subscriptions to avoid any reconnections holding state
+      // Server-side sign out (best-effort)
+      try { await supabase.auth.signOut(); } catch {}
+      // Drop realtime channels to prevent stray reconnects
       try { supabase.removeAllChannels(); } catch {}
-
-      // 4) Verify session is gone; retry a couple times, else last-resort clear storages
-      for (let i = 0; i < 3; i++) {
-        const { data } = await supabase.auth.getSession();
-        if (!data.session) break;
-        await sleep(150);
-        try { await supabase.auth.signOut({ scope: 'local' } as any); } catch {}
-        clearAuthStorage();
-      }
-      const { data: finalCheck } = await supabase.auth.getSession();
-      if (finalCheck.session) {
-        // Last resort: wipe all storage for this origin (rare edge cases)
-        try { localStorage.clear(); } catch {}
-        try { sessionStorage.clear(); } catch {}
-      }
-    } finally {
+      // Clear local auth artifacts
+      clearAuthStorage();
+      // Reset state
       setRoles([]);
       setEffectiveRole(null);
       setUser(null);
       setSession(null);
+    } finally {
       setLoading(false);
-      // As requested: ensure all origin storage is cleared and force a clean navigation to /login
-      try { localStorage.clear(); } catch {}
-      try { sessionStorage.clear(); } catch {}
-      try {
-        // Replace current URL to avoid back-button returning to an authed route
-        window.history.replaceState(null, '', '/login');
-        // Ensure the SPA loads the login route (no full hard reload needed)
-        window.location.replace('/login');
-      } catch {}
     }
   };
 
