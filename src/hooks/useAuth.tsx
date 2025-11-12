@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { useNavigate } from 'react-router-dom';
 
 interface AuthContextType {
   user: User | null;
@@ -21,6 +22,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [roles, setRoles] = useState<string[]>([]);
   const [effectiveRole, setEffectiveRole] = useState<'student' | 'teacher' | null>(null);
   const [loading, setLoading] = useState(true);
+  const [navigateToLogin, setNavigateToLogin] = useState(false);
   const PROJECT_REF = (import.meta as unknown as { env?: Record<string, string | undefined> })?.env?.VITE_SUPABASE_PROJECT_ID;
 
   // Ensure a profile row exist for the authenticated user
@@ -134,11 +136,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             break;
           }
           case 'SIGNED_OUT': {
-            // Reset state and redirect to login
+            // Reset state and trigger navigation to login
             setRoles([]);
             setEffectiveRole(null);
             if (window.location.pathname !== '/login') {
-              window.location.replace('/login');
+              setNavigateToLogin(true);
             }
             break;
           }
@@ -263,62 +265,29 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const signOut = async () => {
-    // Remove known auth-related storage keys and our cached role
-    const clearAuthStorage = () => {
-      try {
-        const keys: string[] = [];
-        for (let i = 0; i < localStorage.length; i++) {
-          const k = localStorage.key(i);
-          if (!k) continue;
-          const isThisProject = PROJECT_REF ? k.startsWith(`sb-${PROJECT_REF}-`) : k.startsWith('sb-');
-          const isAuthToken = /sb-.*-auth-token/i.test(k) || k.includes('supabase.auth.token') || k.includes('supabase.auth.refresh-token');
-          if (isThisProject || isAuthToken) keys.push(k);
-        }
-        keys.forEach(k => localStorage.removeItem(k));
-      } catch (e) { /* ignore localStorage iteration errors */ }
-      try {
-        const sKeys: string[] = [];
-        for (let i = 0; i < sessionStorage.length; i++) {
-          const k = sessionStorage.key(i);
-          if (!k) continue;
-          const isThisProject = PROJECT_REF ? k.startsWith(`sb-${PROJECT_REF}-`) : k.startsWith('sb-');
-          const isAuthToken = /sb-.*-auth-token/i.test(k) || k.includes('supabase.auth.token') || k.includes('supabase.auth.refresh-token');
-          if (isThisProject || isAuthToken) sKeys.push(k);
-        }
-        sKeys.forEach(k => sessionStorage.removeItem(k));
-      } catch (e) { /* ignore sessionStorage iteration errors */ }
+    setLoading(true);
+    try {
+      // Clear cached role
       try {
         if (user?.email) localStorage.removeItem(`accountRole:${user.email.toLowerCase()}`);
       } catch (e) { /* ignore cache delete */ }
-    };
-
-    // Unregister all service workers to prevent cached dashboard HTML
-    const unregisterServiceWorkers = async () => {
-      try {
-        if ('serviceWorker' in navigator) {
-          const registrations = await navigator.serviceWorker.getRegistrations();
-          await Promise.all(registrations.map(reg => reg.unregister()));
-        }
-      } catch (e) { /* ignore service worker errors */ }
-    };
-
-    setLoading(true);
-    try {
-      // Server-side sign out for current device/session
-      try { await supabase.auth.signOut(); } catch (e) { /* ignore signOut errors */ }
+      
+      // Supabase signOut handles all auth cleanup (tokens, storage, etc.)
+      await supabase.auth.signOut();
+      
       // Drop realtime channels to prevent stray reconnects
-      try { supabase.removeAllChannels(); } catch (e) { /* ignore channel removal errors */ }
-      // Clear local auth artifacts
-      clearAuthStorage();
-      // Unregister service workers
-      await unregisterServiceWorkers();
-      // Reset state
+      try { supabase.removeAllChannels(); } catch (e) { /* ignore */ }
+      
+      // Reset local state
       setRoles([]);
       setEffectiveRole(null);
       setUser(null);
       setSession(null);
-      // Hard redirect to login page (forces full page reload, clearing any SPA state)
-      window.location.replace('/login');
+      
+      // Trigger navigation to login page via React Router
+      setNavigateToLogin(true);
+    } catch (error) {
+      console.error('Sign out error:', error);
     } finally {
       setLoading(false);
     }
@@ -326,9 +295,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   return (
     <AuthContext.Provider value={{ user, session, roles, effectiveRole, loading, signUp, signIn, signOut }}>
+      <NavigationHandler navigateToLogin={navigateToLogin} setNavigateToLogin={setNavigateToLogin} />
       {children}
     </AuthContext.Provider>
   );
+};
+
+// Navigation handler component to handle logout redirects
+const NavigationHandler = ({ navigateToLogin, setNavigateToLogin }: { navigateToLogin: boolean; setNavigateToLogin: (val: boolean) => void }) => {
+  const navigate = useNavigate();
+  
+  useEffect(() => {
+    if (navigateToLogin) {
+      setNavigateToLogin(false);
+      navigate('/login', { replace: true });
+    }
+  }, [navigateToLogin, navigate, setNavigateToLogin]);
+  
+  return null;
 };
 
 // eslint-disable-next-line react-refresh/only-export-components
