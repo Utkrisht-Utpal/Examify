@@ -326,19 +326,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             const justLoggedIn = localStorage.getItem('justLoggedIn') === 'true';
             console.log('SIGNED_IN event - justLoggedIn:', justLoggedIn);
             
-            try {
-              setLoading(true);
-              await loadUserSession(session);
-            } finally {
-              if (mounted) setLoading(false);
-            }
-            
-            // Only redirect on explicit user login, not on session restoration
+            // Only show loading state for user-initiated logins, not session restoration
             if (justLoggedIn) {
+              try {
+                setLoading(true);
+                await loadUserSession(session);
+              } finally {
+                if (mounted) setLoading(false);
+              }
               localStorage.removeItem('justLoggedIn');
               console.log('✓ User-initiated login complete');
             } else {
-              console.log('✓ Session restored (no redirect)');
+              // Session restoration - don't show loading, just update state silently
+              console.log('✓ Session restored (no redirect, no loading)');
+              await loadUserSession(session);
             }
             break;
           }

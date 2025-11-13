@@ -11,8 +11,8 @@ const ProtectedRoute = ({ children }: Props) => {
   const navigate = useNavigate();
 
   // Wait for initial session check to complete before making auth decisions
-  if (!initialChecked || loading) {
-    console.log('[ProtectedRoute] Waiting for auth initialization...', { initialChecked, loading });
+  if (!initialChecked) {
+    console.log('[ProtectedRoute] Waiting for initial session check...', { initialChecked });
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
@@ -23,14 +23,14 @@ const ProtectedRoute = ({ children }: Props) => {
     );
   }
   
-  // Also wait for role to be determined before proceeding
-  if (user && session && roleLoading) {
-    console.log('[ProtectedRoute] Waiting for role to load...');
+  // If still loading OR role is loading, show spinner
+  if (loading || (user && session && roleLoading)) {
+    console.log('[ProtectedRoute] Loading auth state...', { loading, roleLoading });
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
-          <p className="text-sm text-muted-foreground">Loading user data...</p>
+          <p className="text-sm text-muted-foreground">Loading...</p>
         </div>
       </div>
     );
