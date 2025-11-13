@@ -9,6 +9,8 @@ interface AuthContextType {
   roles: string[];
   effectiveRole: 'student' | 'teacher' | null;
   loading: boolean;
+  initialChecked: boolean;
+  roleLoading: boolean;
   signUp: (email: string, password: string, fullName: string, role: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -22,6 +24,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [roles, setRoles] = useState<string[]>([]);
   const [effectiveRole, setEffectiveRole] = useState<'student' | 'teacher' | null>(null);
   const [loading, setLoading] = useState(true);
+  const [initialChecked, setInitialChecked] = useState(false);
+  const [roleLoading, setRoleLoading] = useState(false);
   const [navigateToLogin, setNavigateToLogin] = useState(false);
   const PROJECT_REF = (import.meta as unknown as { env?: Record<string, string | undefined> })?.env?.VITE_SUPABASE_PROJECT_ID;
 
@@ -43,6 +47,72 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     } catch (e) {
       console.warn('ensureProfile warning:', e);
     }
+  };
+
+  // Get cached role from sessionStorage (for tab switches)
+  const getCachedRole = (userId: string): string | null => {
+    try {
+      const cached = sessionStorage.getItem(`role:${userId}`);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        // Cache valid for 5 minutes
+        if (parsed.timestamp && Date.now() - parsed.timestamp < 300000) {
+          console.log('✓ Using cached role:', parsed.role);
+          return parsed.role;
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to read cached role:', e);
+    }
+    return null;
+  };
+
+  // Cache role in sessionStorage
+  const setCachedRole = (userId: string, role: string) => {
+    try {
+      sessionStorage.setItem(`role:${userId}`, JSON.stringify({ role, timestamp: Date.now() }));
+    } catch (e) {
+      console.warn('Failed to cache role:', e);
+    }
+  };
+
+  // Resilient role fetching with retries and exponential backoff
+  const fetchRoleWithRetry = async (userId: string, maxAttempts = 3): Promise<string[]> => {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        console.log(`Fetching role (attempt ${attempt}/${maxAttempts})...`);
+        
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
+        
+        const { data: rolesData, error } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', userId)
+          .abortSignal(controller.signal);
+        
+        clearTimeout(timeoutId);
+        
+        if (error) throw error;
+        
+        const roleList = (rolesData || []).map(r => r.role);
+        console.log(`✓ Role fetch successful:`, roleList);
+        return roleList;
+      } catch (e: any) {
+        console.warn(`Role fetch attempt ${attempt} failed:`, e.message || e);
+        
+        if (attempt < maxAttempts) {
+          // Exponential backoff: 500ms, 1000ms, 2000ms
+          const delay = 500 * Math.pow(2, attempt - 1);
+          console.log(`Retrying in ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        } else {
+          console.error('All role fetch attempts failed');
+          throw e;
+        }
+      }
+    }
+    return [];
   };
 
   // Derive a stable role using metadata first, then DB roles, then cached registration choice
@@ -124,6 +194,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       
       if (session?.user) {
         try {
+          setRoleLoading(true);
+          
           // Get role from metadata immediately for fast UI
           const metaRole = (session.user.user_metadata as { role?: string })?.role;
           const quickRole = metaRole || 'student';
@@ -138,58 +210,48 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           ensureProfile(session.user.id, session.user.email, (session.user.user_metadata as { full_name?: string })?.full_name)
             .catch(e => console.warn('ensureProfile failed:', e));
           
-          // Fetch user roles from database with timeout
-          const fetchRoles = async () => {
-            try {
-              console.log('Fetching user roles for:', session.user.id);
-              const { data: rolesData, error: rolesError } = await supabase
-                .from('user_roles')
-                .select('role')
-                .eq('user_id', session.user.id);
-              
-              if (rolesError) {
-                console.error('Error fetching roles:', rolesError);
-                return [quickRole];
+          // Check for cached role first
+          const cachedRole = getCachedRole(session.user.id);
+          if (cachedRole && mounted) {
+            const derived = deriveRole(metaRole, [cachedRole], session.user.email);
+            setEffectiveRole(derived);
+            setRoles([cachedRole]);
+            setRoleLoading(false);
+            console.log('✓ Using cached role, skipping DB fetch');
+            return;
+          }
+          
+          // Fetch user roles from database with retry logic
+          try {
+            const roleList = await fetchRoleWithRetry(session.user.id);
+            
+            if (roleList.length > 0) {
+              const derived = deriveRole(metaRole, roleList, session.user.email);
+              if (mounted) {
+                setRoles(roleList);
+                setEffectiveRole(derived);
+                setCachedRole(session.user.id, roleList[0]); // Cache first role
+                console.log('✓ Role loaded from DB:', derived);
               }
-              
-              const roleList = (rolesData || []).map(r => r.role);
-              console.log('Roles fetched from DB:', roleList);
-              
-              if (roleList.length > 0) {
-                const derived = deriveRole(metaRole, roleList, session.user.email);
-                if (mounted) {
-                  setRoles(roleList);
-                  if (derived !== quickRole) {
-                    setEffectiveRole(derived);
-                    console.log('Updated role from DB:', derived);
-                  }
-                }
-                return roleList;
-              } else {
-                // No DB roles, ensure one exists (background)
-                tryEnsureUserRole(session.user.id, quickRole as 'student' | 'teacher')
-                  .catch(e => console.warn('tryEnsureUserRole failed:', e));
-                if (mounted) setRoles([quickRole]);
-                return [quickRole];
+            } else {
+              // No DB roles, ensure one exists (background)
+              tryEnsureUserRole(session.user.id, quickRole as 'student' | 'teacher')
+                .catch(e => console.warn('tryEnsureUserRole failed:', e));
+              if (mounted) {
+                setRoles([quickRole]);
+                setCachedRole(session.user.id, quickRole);
               }
-            } catch (e) { 
-              console.error('Role fetch exception:', e);
-              if (mounted) setRoles([quickRole]);
-              return [quickRole];
             }
-          };
-          
-          // Fetch roles with 2-second timeout
-          const rolesPromise = fetchRoles();
-          const timeoutPromise = new Promise<string[]>((resolve) => {
-            setTimeout(() => {
-              console.warn('Role fetch timed out after 2s, using metadata role');
-              if (mounted) setRoles([quickRole]);
-              resolve([quickRole]);
-            }, 2000);
-          });
-          
-          await Promise.race([rolesPromise, timeoutPromise]);
+          } catch (e) {
+            // All retries failed - fall back to metadata role
+            console.error('Role fetch failed after retries, using metadata fallback');
+            if (mounted) {
+              const fallbackRole = metaRole || 'student';
+              setEffectiveRole(fallbackRole as 'student' | 'teacher');
+              setRoles([fallbackRole]);
+              console.warn('⚠️ Using app_metadata fallback role:', fallbackRole);
+            }
+          }
           
           // Persist role to metadata if needed (non-blocking)
           persistRoleToMetadataIfNeeded(metaRole, session.user.email, quickRole as 'student' | 'teacher')
@@ -204,12 +266,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             setRoles([fallbackRole]);
             console.warn('Using fallback role:', fallbackRole);
           }
+        } finally {
+          if (mounted) setRoleLoading(false);
         }
       } else {
         // No session - clear everything
         if (mounted) {
           setRoles([]);
           setEffectiveRole(null);
+          setRoleLoading(false);
           console.log('No session found - clearing auth state');
         }
       }
@@ -219,6 +284,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     (async () => {
       try {
         console.log('Checking for existing session on mount...');
+        console.log('initialChecked status:', false);
         
         // Debug: Check what's in localStorage
         const lsKeys = Object.keys(localStorage);
@@ -238,6 +304,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         console.error('Error checking session:', error);
       } finally {
         if (mounted) {
+          console.log('Setting initialChecked to true');
+          setInitialChecked(true);
           console.log('Setting loading to false');
           setLoading(false);
         }
@@ -254,11 +322,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         // Handle events
         switch (event) {
           case 'SIGNED_IN': {
+            // Check if this is a user-initiated login or session restoration
+            const justLoggedIn = localStorage.getItem('justLoggedIn') === 'true';
+            console.log('SIGNED_IN event - justLoggedIn:', justLoggedIn);
+            
             try {
               setLoading(true);
               await loadUserSession(session);
             } finally {
               if (mounted) setLoading(false);
+            }
+            
+            // Only redirect on explicit user login, not on session restoration
+            if (justLoggedIn) {
+              localStorage.removeItem('justLoggedIn');
+              console.log('✓ User-initiated login complete');
+            } else {
+              console.log('✓ Session restored (no redirect)');
             }
             break;
           }
@@ -269,6 +349,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             setUser(null);
             setSession(null);
             setLoading(false);
+            setRoleLoading(false);
+            localStorage.removeItem('justLoggedIn');
             // Trigger navigation to login if not already there
             if (window.location.pathname !== '/login' && window.location.pathname !== '/logout') {
               setNavigateToLogin(true);
@@ -329,6 +411,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signIn = async (email: string, password: string) => {
     console.log('Attempting sign in with email:', email);
+    // Set flag to indicate user-initiated login
+    localStorage.setItem('justLoggedIn', 'true');
     setLoading(true);
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
@@ -403,7 +487,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, roles, effectiveRole, loading, signUp, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, session, roles, effectiveRole, loading, initialChecked, roleLoading, signUp, signIn, signOut }}>
       <NavigationHandler navigateToLogin={navigateToLogin} setNavigateToLogin={setNavigateToLogin} />
       {children}
     </AuthContext.Provider>
