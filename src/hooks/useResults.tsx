@@ -76,10 +76,9 @@ export const useResults = (userId?: string, examId?: string) => {
 
       // Merge both sources, prioritizing exam_attempts for graded exams
       const mergedResults = transformedResults.map(transformed => {
-        // Match feedback by exam_id + student_id (submission_id in results references submissions.id)
-        const oldResult = oldResults?.find(r => 
-          r.exam_id === transformed.exam_id && r.student_id === transformed.student_id
-        );
+        // Prefer exact match by submission/attempt ID, fallback to exam_id + student_id
+        const oldResult = oldResults?.find(r => r.submission_id === transformed.submission_id)
+          || oldResults?.find(r => r.exam_id === transformed.exam_id && r.student_id === transformed.student_id);
         return {
           ...transformed,
           feedback: oldResult?.feedback || null,
