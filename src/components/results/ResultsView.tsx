@@ -37,6 +37,7 @@ interface StudentResult {
   percentage: number;
   timeSpent: string;
   submittedAt: string;
+  feedback: string | null;
   questionAnalysis: {
     questionId: string;
     question: string;
@@ -73,12 +74,19 @@ export const ResultsView = ({ user, onBack }: ResultsViewProps) => {
       try {
         const detailedData = await Promise.all(
           results.map(async (result) => {
-            // Fetch submission details with answers
-            const { data: submission } = await supabase
-              .from('submissions')
+            // Fetch submission/attempt details with answers
+            const { data: attempt } = await supabase
+              .from('exam_attempts')
               .select('answers, time_taken')
               .eq('id', result.submission_id)
               .maybeSingle();
+
+            // Also try submissions table as fallback
+            const { data: submission } = !attempt ? await supabase
+              .from('submissions')
+              .select('answers, time_taken')
+              .eq('id', result.submission_id)
+              .maybeSingle() : { data: null };
 
             // Fetch exam questions
             const { data: examQuestions } = await supabase
@@ -97,7 +105,8 @@ export const ResultsView = ({ user, onBack }: ResultsViewProps) => {
               .eq('exam_id', result.exam_id)
               .order('order_number');
 
-            const answers = submission?.answers || {};
+            const answers = (attempt?.answers || submission?.answers || {}) as Record<string, string>;
+            const timeInMinutes = (attempt?.time_taken || submission?.time_taken || 0) as number;
             let correctAnswers = 0;
             let incorrectAnswers = 0;
             
@@ -118,7 +127,6 @@ export const ResultsView = ({ user, onBack }: ResultsViewProps) => {
               };
             }) || [];
 
-            const timeInMinutes = submission?.time_taken || 0;
             const hours = Math.floor(timeInMinutes / 60);
             const minutes = timeInMinutes % 60;
             const timeSpent = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
@@ -136,7 +144,8 @@ export const ResultsView = ({ user, onBack }: ResultsViewProps) => {
               percentage: result.percentage,
               timeSpent,
               submittedAt: new Date(result.created_at).toLocaleString(),
-              questionAnalysis
+              questionAnalysis,
+              feedback: (result as any).feedback || null
             };
           })
         );
@@ -263,6 +272,21 @@ export const ResultsView = ({ user, onBack }: ResultsViewProps) => {
             </CardContent>
           </Card>
         </div>
+
+        {/* Teacher Feedback */}
+        {result.feedback && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Teacher's Feedback</CardTitle>
+              <CardDescription>Comments from your teacher</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="p-4 border rounded-lg bg-muted/50">
+                <p className="text-sm whitespace-pre-wrap">{result.feedback}</p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Question Analysis */}
         <Card>
