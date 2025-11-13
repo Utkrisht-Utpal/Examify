@@ -37,24 +37,48 @@ export const TeacherDashboard = ({ user, onCreateExam, onViewResults, onViewExam
   }, []);
 
   // Fetch actual student count from user_roles table with real-time updates
+  // Falls back to counting unique students from exam_attempts if user_roles is empty
   React.useEffect(() => {
     const fetchStudentCount = async () => {
-      const { count, error } = await supabase
+      // Try user_roles first
+      const { count: rolesCount, error: rolesError } = await supabase
         .from('user_roles')
         .select('*', { count: 'exact', head: true })
         .eq('role', 'student');
       
-      if (!error && count !== null) {
-        setStudentCount(count);
+      if (!rolesError && rolesCount !== null && rolesCount > 0) {
+        setStudentCount(rolesCount);
+        return;
+      }
+
+      // Fallback: count unique students from exam_attempts
+      const { data: attempts, error: attemptsError } = await supabase
+        .from('exam_attempts')
+        .select('student_id');
+      
+      if (!attemptsError && attempts) {
+        const uniqueStudents = new Set(attempts.map(a => a.student_id));
+        setStudentCount(uniqueStudents.size);
+        return;
+      }
+
+      // Final fallback: count from submissions table
+      const { data: submissions, error: submissionsError } = await supabase
+        .from('submissions')
+        .select('student_id');
+      
+      if (!submissionsError && submissions) {
+        const uniqueStudents = new Set(submissions.map(s => s.student_id));
+        setStudentCount(uniqueStudents.size);
       }
     };
 
     // Initial fetch
     fetchStudentCount();
 
-    // Subscribe to real-time changes
+    // Subscribe to real-time changes on multiple tables
     const channel = supabase
-      .channel('user_roles_changes')
+      .channel('student_count_changes')
       .on(
         'postgres_changes',
         {
@@ -64,7 +88,17 @@ export const TeacherDashboard = ({ user, onCreateExam, onViewResults, onViewExam
           filter: 'role=eq.student'
         },
         () => {
-          // Refetch count when changes occur
+          fetchStudentCount();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'exam_attempts'
+        },
+        () => {
           fetchStudentCount();
         }
       )
