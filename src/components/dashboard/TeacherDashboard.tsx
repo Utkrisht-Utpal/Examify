@@ -41,10 +41,12 @@ export const TeacherDashboard = ({ user, onCreateExam, onViewResults, onViewExam
     let cancelled = false;
 
     const fetchFromUserRoles = async () => {
+      // Avoid head:true because some setups drop count in HEAD responses under RLS
       const { count, error } = await supabase
         .from('user_roles')
-        .select('*', { count: 'exact', head: true })
-        .eq('role', 'student');
+        .select('user_id', { count: 'exact' }) // no head; allow PostgREST to include count reliably
+        .eq('role', 'student')
+        .range(0, 0); // fetch minimal payload while still getting count
       if (cancelled) return { count: null, error };
       return { count, error };
     };
