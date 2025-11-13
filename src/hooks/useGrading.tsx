@@ -6,7 +6,7 @@ export const useGrading = (examId?: string) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Fetch submissions that need grading
+  // Fetch submissions that need grading (filter out fully graded ones)
   const { data: pendingSubmissions, isLoading: isLoadingSubmissions, error: submissionsError } = useQuery({
     queryKey: ['pending-submissions', examId],
     queryFn: async () => {
@@ -33,8 +33,9 @@ export const useGrading = (examId?: string) => {
         const examIds = teacherExams.map(e => e.id);
         console.log('Teacher exam IDs:', examIds);
         
+        // Use exam_attempts for status-aware pending list
         let query = supabase
-          .from('submissions')
+          .from('exam_attempts')
           .select(`
             id,
             exam_id,
@@ -42,11 +43,13 @@ export const useGrading = (examId?: string) => {
             answers,
             time_taken,
             submitted_at,
+            status,
+            total_score,
             exams!inner(id, title, subject, total_marks, created_by),
-            profiles!inner(full_name),
-            results(id, score, graded_at, graded_by)
+            profiles!inner(full_name)
           `)
           .in('exam_id', examIds)
+          .in('status', ['submitted', 'in_review'])
           .order('submitted_at', { ascending: false });
         
         if (examId) {
@@ -56,12 +59,57 @@ export const useGrading = (examId?: string) => {
         const { data, error } = await query;
         if (error) throw error;
         
-        console.log('Fetched submissions:', data?.length);
+        console.log('Fetched pending submissions:', data?.length);
         return data || [];
       } catch (error) {
         console.error('Error fetching pending submissions:', error);
         throw error;
       }
+    },
+    enabled: true
+  });
+
+  // Fetch all submissions (including graded)
+  const { data: allSubmissions, isLoading: isLoadingAllSubmissions } = useQuery({
+    queryKey: ['all-submissions', examId],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      const { data: teacherExams, error: examsError } = await supabase
+        .from('exams')
+        .select('id')
+        .eq('created_by', user.id);
+      if (examsError) throw examsError;
+      if (!teacherExams || teacherExams.length === 0) return [];
+
+      const examIds = teacherExams.map(e => e.id);
+      let query = supabase
+        .from('exam_attempts')
+        .select(`
+          id,
+          exam_id,
+          student_id,
+          answers,
+          time_taken,
+          submitted_at,
+          status,
+          total_score,
+          graded_at,
+          exams!inner(id, title, subject, total_marks, created_by),
+          profiles!inner(full_name)
+        `)
+        .in('exam_id', examIds)
+        .neq('status', 'draft')
+        .order('submitted_at', { ascending: false });
+
+      if (examId) {
+        query = query.eq('exam_id', examId);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return data || [];
     },
     enabled: true
   });
@@ -221,6 +269,8 @@ export const useGrading = (examId?: string) => {
     pendingSubmissions,
     isLoadingSubmissions,
     submissionsError,
+    allSubmissions,
+    isLoadingAllSubmissions,
     fetchSubmissionDetails,
     gradeSubmission
   };

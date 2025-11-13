@@ -24,7 +24,7 @@ interface TeacherDashboardProps {
 export const TeacherDashboard = ({ user, onCreateExam, onViewResults, onViewExam, onGradeSubmission }: TeacherDashboardProps) => {
   const { exams, isLoading: examsLoading, updateExamStatus, deleteExam } = useExams();
   const { submissions } = useSubmissions();
-  const { pendingSubmissions, isLoadingSubmissions } = useGrading();
+  const { pendingSubmissions, isLoadingSubmissions, allSubmissions, isLoadingAllSubmissions } = useGrading();
   
   // Get current user ID from Supabase
   const [userId, setUserId] = React.useState<string | null>(null);
@@ -262,6 +262,7 @@ export const TeacherDashboard = ({ user, onCreateExam, onViewResults, onViewExam
               <Badge variant="destructive" className="ml-2">{pendingSubmissions.length}</Badge>
             )}
           </TabsTrigger>
+          <TabsTrigger value="submissions">All Submissions</TabsTrigger>
           <TabsTrigger value="activity">Recent Activity</TabsTrigger>
         </TabsList>
 
@@ -418,6 +419,84 @@ export const TeacherDashboard = ({ user, onCreateExam, onViewResults, onViewExam
                           onClick={() => onGradeSubmission(submission.id)}
                         >
                           {isGraded ? 'Review' : 'Grade Now'}
+                        </Button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="submissions" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>All Submissions</CardTitle>
+              <CardDescription>View all student submissions with grading status</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoadingAllSubmissions ? (
+                <p className="text-center text-muted-foreground py-4">Loading submissions...</p>
+              ) : !allSubmissions || allSubmissions.length === 0 ? (
+                <p className="text-center text-muted-foreground py-4">No submissions yet</p>
+              ) : (
+                <div className="space-y-4">
+                  {allSubmissions.map((submission) => {
+                    const isGraded = submission.status === 'graded';
+                    const isInReview = submission.status === 'in_review';
+                    
+                    return (
+                      <div key={submission.id} className="flex items-center justify-between p-4 border rounded-lg">
+                        <div className="space-y-2 flex-1">
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-semibold">{submission.profiles.full_name}</h3>
+                            {isGraded ? (
+                              <Badge variant="outline" className="bg-success/10 text-success">
+                                Graded
+                              </Badge>
+                            ) : isInReview ? (
+                              <Badge variant="outline" className="bg-warning/10 text-warning">
+                                In Review
+                              </Badge>
+                            ) : (
+                              <Badge variant="secondary">
+                                Submitted
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                            <div className="flex items-center gap-1">
+                              <BookOpen className="h-3 w-3" />
+                              {submission.exams.title}
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Calendar className="h-3 w-3" />
+                              {new Date(submission.submitted_at).toLocaleString()}
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              {submission.time_taken || 0} min
+                            </div>
+                          </div>
+                          {isGraded && (
+                            <div className="text-sm">
+                              <span className="text-muted-foreground">Score: </span>
+                              <span className="font-medium">
+                                {submission.total_score}/{submission.exams.total_marks}
+                              </span>
+                              <span className="text-muted-foreground ml-2">
+                                ({Math.round((submission.total_score / submission.exams.total_marks) * 100)}%)
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        <Button 
+                          variant={isGraded ? "outline" : "default"} 
+                          size="sm"
+                          onClick={() => onGradeSubmission(submission.id)}
+                        >
+                          {isGraded ? 'View Grade' : 'Grade Now'}
                         </Button>
                       </div>
                     );
