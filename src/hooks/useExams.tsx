@@ -72,12 +72,12 @@ export const useExams = () => {
 
   const deleteExam = useMutation({
     mutationFn: async (examId: string) => {
-      const { error } = await supabase
-        .from('exams')
-        .delete()
-        .eq('id', examId);
+      const { data, error } = await supabase.rpc('delete_exam', {
+        exam_id_param: examId
+      });
+      
       if (error) throw error;
-      return examId;
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['exams'] });

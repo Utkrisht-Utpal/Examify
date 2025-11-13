@@ -14,6 +14,69 @@ export type Database = {
   }
   public: {
     Tables: {
+      exam_attempts: {
+        Row: {
+          answers: Json
+          created_at: string | null
+          exam_id: string
+          graded_at: string | null
+          id: string
+          started_at: string | null
+          status: Database["public"]["Enums"]["attempt_status"]
+          student_id: string
+          submitted_at: string | null
+          time_taken: number | null
+          total_score: number
+          updated_at: string | null
+          version: number
+        }
+        Insert: {
+          answers?: Json
+          created_at?: string | null
+          exam_id: string
+          graded_at?: string | null
+          id?: string
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["attempt_status"]
+          student_id: string
+          submitted_at?: string | null
+          time_taken?: number | null
+          total_score?: number
+          updated_at?: string | null
+          version?: number
+        }
+        Update: {
+          answers?: Json
+          created_at?: string | null
+          exam_id?: string
+          graded_at?: string | null
+          id?: string
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["attempt_status"]
+          student_id?: string
+          submitted_at?: string | null
+          time_taken?: number | null
+          total_score?: number
+          updated_at?: string | null
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exam_attempts_exam_id_fkey"
+            columns: ["exam_id"]
+            isOneToOne: false
+            referencedRelation: "exams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "exam_attempts_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       exam_questions: {
         Row: {
           exam_id: string
@@ -43,6 +106,112 @@ export type Database = {
           },
           {
             foreignKeyName: "exam_questions_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "questions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      grades: {
+        Row: {
+          attempt_id: string
+          created_at: string | null
+          feedback: string | null
+          graded_at: string | null
+          grader_id: string | null
+          id: string
+          is_correct: boolean | null
+          max_score: number
+          question_id: string
+          score: number
+          selected_option_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          attempt_id: string
+          created_at?: string | null
+          feedback?: string | null
+          graded_at?: string | null
+          grader_id?: string | null
+          id?: string
+          is_correct?: boolean | null
+          max_score: number
+          question_id: string
+          score?: number
+          selected_option_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          attempt_id?: string
+          created_at?: string | null
+          feedback?: string | null
+          graded_at?: string | null
+          grader_id?: string | null
+          id?: string
+          is_correct?: boolean | null
+          max_score?: number
+          question_id?: string
+          score?: number
+          selected_option_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "grades_attempt_id_fkey"
+            columns: ["attempt_id"]
+            isOneToOne: false
+            referencedRelation: "exam_attempts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "grades_grader_id_fkey"
+            columns: ["grader_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "grades_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "questions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "grades_selected_option_id_fkey"
+            columns: ["selected_option_id"]
+            isOneToOne: false
+            referencedRelation: "options"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      options: {
+        Row: {
+          created_at: string | null
+          id: string
+          option_order: number
+          option_text: string
+          question_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          option_order: number
+          option_text: string
+          question_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          option_order?: number
+          option_text?: string
+          question_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "options_question_id_fkey"
             columns: ["question_id"]
             isOneToOne: false
             referencedRelation: "questions"
@@ -142,6 +311,7 @@ export type Database = {
       questions: {
         Row: {
           correct_answer: string
+          correct_option_id: string | null
           created_at: string | null
           created_by: string
           id: string
@@ -154,6 +324,7 @@ export type Database = {
         }
         Insert: {
           correct_answer: string
+          correct_option_id?: string | null
           created_at?: string | null
           created_by: string
           id?: string
@@ -166,6 +337,7 @@ export type Database = {
         }
         Update: {
           correct_answer?: string
+          correct_option_id?: string | null
           created_at?: string | null
           created_by?: string
           id?: string
@@ -177,6 +349,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "questions_correct_option_id_fkey"
+            columns: ["correct_option_id"]
+            isOneToOne: false
+            referencedRelation: "options"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "questions_created_by_fkey"
             columns: ["created_by"]
@@ -299,6 +478,47 @@ export type Database = {
           },
         ]
       }
+      student_stats: {
+        Row: {
+          average_percentage: number | null
+          average_score: number | null
+          graded_attempts: number
+          id: string
+          last_attempt_at: string | null
+          student_id: string
+          total_attempts: number
+          updated_at: string | null
+        }
+        Insert: {
+          average_percentage?: number | null
+          average_score?: number | null
+          graded_attempts?: number
+          id?: string
+          last_attempt_at?: string | null
+          student_id: string
+          total_attempts?: number
+          updated_at?: string | null
+        }
+        Update: {
+          average_percentage?: number | null
+          average_score?: number | null
+          graded_attempts?: number
+          id?: string
+          last_attempt_at?: string | null
+          student_id?: string
+          total_attempts?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_stats_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string | null
@@ -333,6 +553,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      auto_grade_mcq: {
+        Args: { attempt_id_param: string }
+        Returns: Json
+      }
+      delete_exam: {
+        Args: { exam_id_param: string }
+        Returns: Json
+      }
       get_user_role: {
         Args: { user_id_param?: string }
         Returns: Database["public"]["Enums"]["app_role"]
@@ -354,6 +582,7 @@ export type Database = {
     }
     Enums: {
       app_role: "student" | "teacher" | "admin"
+      attempt_status: "draft" | "submitted" | "in_review" | "graded" | "closed"
       exam_status: "draft" | "published" | "archived"
       question_type: "mcq" | "descriptive" | "coding"
     }
