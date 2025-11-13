@@ -105,7 +105,7 @@ export const useGrading = (examId?: string) => {
     };
   };
 
-  // Grade submission mutation
+  // Grade submission mutation with per-question grades
   const gradeSubmission = useMutation({
     mutationFn: async ({
       submissionId,
@@ -113,7 +113,8 @@ export const useGrading = (examId?: string) => {
       studentId,
       score,
       totalMarks,
-      feedback
+      feedback,
+      questionGrades
     }: {
       submissionId: string;
       examId: string;
@@ -121,12 +122,42 @@ export const useGrading = (examId?: string) => {
       score: number;
       totalMarks: number;
       feedback?: string;
+      questionGrades?: Record<string, { score: number; maxScore: number }>;
     }) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
       const percentage = Math.round((score / totalMarks) * 100);
 
+      // Use exam_attempts instead of submissions
+      // The attempt_id is the same as submission_id for migrated data
+      const attemptId = submissionId;
+
+      // If questionGrades provided, insert/update grades table
+      if (questionGrades && Object.keys(questionGrades).length > 0) {
+        const gradesData = Object.entries(questionGrades).map(([questionId, grade]) => ({
+          attempt_id: attemptId,
+          question_id: questionId,
+          score: grade.score,
+          max_score: grade.maxScore,
+          grader_id: user.id,
+          graded_at: new Date().toISOString()
+        }));
+
+        // Upsert grades (insert or update)
+        for (const gradeData of gradesData) {
+          const { error } = await supabase
+            .from('grades')
+            .upsert(gradeData, {
+              onConflict: 'attempt_id,question_id'
+            });
+          
+          if (error) throw error;
+        }
+        // Triggers will automatically update exam_attempts.total_score and status
+      }
+
+      // Still maintain results table for backward compatibility
       // Check if result already exists
       const { data: existingResult } = await supabase
         .from('results')

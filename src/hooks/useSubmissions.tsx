@@ -53,19 +53,73 @@ export const useSubmissions = (examId?: string) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      const { data, error } = await supabase
+      // Check if exam_attempt already exists
+      const { data: existingAttempt } = await supabase
+        .from('exam_attempts')
+        .select('id, status')
+        .eq('exam_id', examId)
+        .eq('student_id', user.id)
+        .maybeSingle();
+
+      // Prevent resubmission if already submitted
+      if (existingAttempt && existingAttempt.status !== 'draft') {
+        throw new Error('You have already submitted this exam');
+      }
+
+      let attemptData;
+      if (existingAttempt) {
+        // Update existing draft attempt to submitted
+        const { data, error } = await supabase
+          .from('exam_attempts')
+          .update({
+            answers,
+            time_taken: timeTaken,
+            status: 'submitted',
+            submitted_at: new Date().toISOString()
+          })
+          .eq('id', existingAttempt.id)
+          .select()
+          .single();
+        
+        if (error) throw error;
+        attemptData = data;
+      } else {
+        // Create new attempt as submitted
+        const { data, error } = await supabase
+          .from('exam_attempts')
+          .insert({
+            exam_id: examId,
+            student_id: user.id,
+            answers,
+            time_taken: timeTaken,
+            status: 'submitted',
+            submitted_at: new Date().toISOString(),
+            started_at: new Date().toISOString()
+          })
+          .select()
+          .single();
+        
+        if (error) throw error;
+        attemptData = data;
+      }
+
+      // Also insert into submissions table for backward compatibility
+      const { error: submissionError } = await supabase
         .from('submissions')
-        .insert({
+        .upsert({
+          id: attemptData.id,
           exam_id: examId,
           student_id: user.id,
           answers,
-          time_taken: timeTaken
-        })
-        .select()
-        .single();
+          time_taken: timeTaken,
+          submitted_at: attemptData.submitted_at
+        }, {
+          onConflict: 'exam_id,student_id'
+        });
       
-      if (error) throw error;
-      return data;
+      if (submissionError) console.warn('Failed to sync with submissions table:', submissionError);
+      
+      return attemptData;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['submissions'] });

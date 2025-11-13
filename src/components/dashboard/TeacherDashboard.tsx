@@ -100,12 +100,26 @@ export const TeacherDashboard = ({ user, onCreateExam, onViewResults, onViewExam
 
     fetchAverages();
 
-    // Realtime updates for results table
+    // Realtime updates for results and grades tables
     const channel = supabase
-      .channel('results_changes')
+      .channel('results_and_grades_changes')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'results' },
+        () => {
+          fetchAverages();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'grades' },
+        () => {
+          fetchAverages();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'exam_attempts' },
         () => {
           fetchAverages();
         }
