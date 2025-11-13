@@ -54,6 +54,7 @@ export const GradingInterface = ({ submissionId, onBack }: GradingInterfaceProps
   const [submissionData, setSubmissionData] = useState<SubmissionData | null>(null);
   // Allow empty string during typing to prevent auto-reset to 0
   const [questionGrades, setQuestionGrades] = useState<Record<string, number | ''>>({});
+  const [questionMarking, setQuestionMarking] = useState<Record<string, boolean | null>>({});
   const [feedback, setFeedback] = useState("");
   const [totalScore, setTotalScore] = useState(0);
   
@@ -84,9 +85,22 @@ export const GradingInterface = ({ submissionId, onBack }: GradingInterfaceProps
           });
         }
         
+        // Initialize marking based on auto-grading
+        const initialMarking: Record<string, boolean | null> = {};
+        Object.entries(initialGrades).forEach(([qId, score]) => {
+          if (typeof score === 'number') {
+            const question = data.questions.find(eq => eq.questions.id === qId)?.questions;
+            if (question) {
+              initialMarking[qId] = score === question.points ? true : score === 0 ? false : null;
+            }
+          }
+        });
+        
         console.log('Initial grades:', initialGrades);
+        console.log('Initial marking:', initialMarking);
         console.log('Auto score:', autoScore);
         setQuestionGrades(initialGrades);
+        setQuestionMarking(initialMarking);
         setTotalScore(autoScore);
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to load submission';
@@ -122,17 +136,38 @@ export const GradingInterface = ({ submissionId, onBack }: GradingInterfaceProps
     setTotalScore(newTotal);
   };
 
+  const handleMarkCorrect = (questionId: string, maxScore: number) => {
+    setQuestionMarking(prev => ({ ...prev, [questionId]: true }));
+    setQuestionGrades(prev => {
+      const updated = { ...prev, [questionId]: maxScore };
+      const newTotal = Object.values(updated).reduce((sum, pts) => sum + (typeof pts === 'number' ? pts : 0), 0);
+      setTotalScore(newTotal);
+      return updated;
+    });
+  };
+
+  const handleMarkIncorrect = (questionId: string) => {
+    setQuestionMarking(prev => ({ ...prev, [questionId]: false }));
+    setQuestionGrades(prev => {
+      const updated = { ...prev, [questionId]: 0 };
+      const newTotal = Object.values(updated).reduce((sum, pts) => sum + (typeof pts === 'number' ? pts : 0), 0);
+      setTotalScore(newTotal);
+      return updated;
+    });
+  };
+
   const handleSubmitGrade = async () => {
     if (!submissionData) return;
 
     // Convert questionGrades to the format expected by the mutation
-    const questionGradesFormatted: Record<string, { score: number; maxScore: number }> = {};
+    const questionGradesFormatted: Record<string, { score: number; maxScore: number; isCorrect: boolean | null }> = {};
     Object.entries(questionGrades).forEach(([questionId, score]) => {
       const question = submissionData.questions.find(eq => eq.questions.id === questionId)?.questions;
       if (question && typeof score === 'number') {
         questionGradesFormatted[questionId] = {
           score: score,
-          maxScore: question.points
+          maxScore: question.points,
+          isCorrect: questionMarking[questionId] ?? null
         };
       }
     });
@@ -307,34 +342,71 @@ export const GradingInterface = ({ submissionId, onBack }: GradingInterfaceProps
 
                   <Separator />
 
-                  <div className="flex items-center gap-4">
-                    <div className="flex-1">
-                      <Label htmlFor={`points-${question.id}`}>Assign Points</Label>
-                      <Input
-                        id={`points-${question.id}`}
-                        type="number"
-                        min={0}
-                        max={Number.isFinite(Number(question.points)) && Number(question.points) >= 0 ? Number(question.points) : undefined}
-                        value={questionGrades[question.id] === '' || questionGrades[question.id] === undefined ? '' : (questionGrades[question.id] as number)}
-                        onChange={(e) => handleGradeChange(
-                          question.id,
-                          e.target.value,
-                          question.points
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-4">
+                      <div className="flex-1">
+                        <Label htmlFor={`points-${question.id}`}>Assign Points</Label>
+                        <Input
+                          id={`points-${question.id}`}
+                          type="number"
+                          min={0}
+                          max={Number.isFinite(Number(question.points)) && Number(question.points) >= 0 ? Number(question.points) : undefined}
+                          value={questionGrades[question.id] === '' || questionGrades[question.id] === undefined ? '' : (questionGrades[question.id] as number)}
+                          onChange={(e) => handleGradeChange(
+                            question.id,
+                            e.target.value,
+                            question.points
+                          )}
+                          className="w-32"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {isCorrect ? (
+                          <Badge className="bg-success text-success-foreground">
+                            <CheckCircle className="h-3 w-3 mr-1" />
+                            Auto-graded: Correct
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary">
+                            <XCircle className="h-3 w-3 mr-1" />
+                            Needs review
+                          </Badge>
                         )}
-                        className="w-32"
-                      />
+                      </div>
                     </div>
+
                     <div className="flex items-center gap-2">
-                      {isCorrect ? (
-                        <Badge className="bg-success text-success-foreground">
-                          <CheckCircle className="h-3 w-3 mr-1" />
-                          Auto-graded: Correct
-                        </Badge>
-                      ) : (
-                        <Badge variant="secondary">
-                          <XCircle className="h-3 w-3 mr-1" />
-                          Needs review
-                        </Badge>
+                      <Label>Mark as:</Label>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={questionMarking[question.id] === true ? "default" : "outline"}
+                        className="h-8"
+                        onClick={() => handleMarkCorrect(question.id, question.points)}
+                      >
+                        <CheckCircle className="h-3 w-3 mr-1" />
+                        Correct
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={questionMarking[question.id] === false ? "destructive" : "outline"}
+                        className="h-8"
+                        onClick={() => handleMarkIncorrect(question.id)}
+                      >
+                        <XCircle className="h-3 w-3 mr-1" />
+                        Incorrect
+                      </Button>
+                      {questionMarking[question.id] !== null && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          className="h-8"
+                          onClick={() => setQuestionMarking(prev => ({ ...prev, [question.id]: null }))}
+                        >
+                          Clear
+                        </Button>
                       )}
                     </div>
                   </div>

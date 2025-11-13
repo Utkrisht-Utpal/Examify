@@ -111,7 +111,7 @@ export const ResultsView = ({ user, onBack }: ResultsViewProps) => {
             // Fetch actual grades given by teacher
             const { data: grades } = await supabase
               .from('grades')
-              .select('question_id, score, max_score')
+              .select('question_id, score, max_score, is_correct')
               .eq('attempt_id', result.submission_id);
 
             const gradesMap = new Map(grades?.map(g => [g.question_id, g]) || []);
@@ -126,9 +126,9 @@ export const ResultsView = ({ user, onBack }: ResultsViewProps) => {
               const userAnswer = answers[question.id] || '';
               const grade = gradesMap.get(question.id);
               
-              // Use grade to determine correct/incorrect
-              const isCorrect = grade ? grade.score === grade.max_score : false;
-              const isIncorrect = grade ? grade.score === 0 : false;
+              // Use is_correct flag if set, otherwise fallback to score logic
+              const isCorrect = grade?.is_correct === true || (grade?.is_correct === null && grade.score === grade.max_score);
+              const isIncorrect = grade?.is_correct === false || (grade?.is_correct === null && grade.score === 0);
               
               if (isCorrect) correctAnswers++;
               else if (isIncorrect) incorrectAnswers++;

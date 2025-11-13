@@ -188,6 +188,7 @@ export const useGrading = (examId?: string) => {
           question_id: questionId,
           score: grade.score,
           max_score: grade.maxScore,
+          is_correct: grade.isCorrect ?? null,
           grader_id: user.id,
           graded_at: new Date().toISOString()
         }));
