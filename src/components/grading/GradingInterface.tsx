@@ -125,13 +125,26 @@ export const GradingInterface = ({ submissionId, onBack }: GradingInterfaceProps
   const handleSubmitGrade = async () => {
     if (!submissionData) return;
 
+    // Convert questionGrades to the format expected by the mutation
+    const questionGradesFormatted: Record<string, { score: number; maxScore: number }> = {};
+    Object.entries(questionGrades).forEach(([questionId, score]) => {
+      const question = submissionData.questions.find(eq => eq.questions.id === questionId)?.questions;
+      if (question && typeof score === 'number') {
+        questionGradesFormatted[questionId] = {
+          score: score,
+          maxScore: question.points
+        };
+      }
+    });
+
     await gradeSubmission.mutateAsync({
       submissionId: submissionData.submission.id,
       examId: submissionData.submission.exam_id,
       studentId: submissionData.submission.student_id,
       score: totalScore,
       totalMarks: submissionData.submission.exams.total_marks,
-      feedback
+      feedback,
+      questionGrades: questionGradesFormatted
     });
 
     onBack();
