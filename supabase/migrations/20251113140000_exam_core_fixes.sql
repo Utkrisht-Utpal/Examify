@@ -70,6 +70,7 @@ CREATE TABLE IF NOT EXISTS public.options (
 ALTER TABLE public.options ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies for options (same visibility as questions)
+DROP POLICY IF EXISTS "Options visible with questions" ON public.options;
 CREATE POLICY "Options visible with questions"
   ON public.options
   FOR SELECT
@@ -89,6 +90,7 @@ CREATE POLICY "Options visible with questions"
     )
   );
 
+DROP POLICY IF EXISTS "Teachers can manage options" ON public.options;
 CREATE POLICY "Teachers can manage options"
   ON public.options
   FOR ALL
