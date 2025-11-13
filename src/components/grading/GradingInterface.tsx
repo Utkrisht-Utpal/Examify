@@ -134,16 +134,16 @@ export const GradingInterface = ({ submissionId, onBack }: GradingInterfaceProps
     const newTotal = Object.values(merged).reduce((sum, pts) => sum + (typeof pts === 'number' ? pts : 0), 0);
     setQuestionGrades(merged);
     setTotalScore(newTotal);
+
+    // If marking is "incorrect" but teacher gives non-zero marks, auto-clear incorrect flag
+    if (clamped > 0 && questionMarking[questionId] === false) {
+      setQuestionMarking(prev => ({ ...prev, [questionId]: null }));
+    }
   };
 
-  const handleMarkCorrect = (questionId: string, maxScore: number) => {
+  const handleMarkCorrect = (questionId: string) => {
+    // Just mark as correct, keep the current score (or set to max if empty)
     setQuestionMarking(prev => ({ ...prev, [questionId]: true }));
-    setQuestionGrades(prev => {
-      const updated = { ...prev, [questionId]: maxScore };
-      const newTotal = Object.values(updated).reduce((sum, pts) => sum + (typeof pts === 'number' ? pts : 0), 0);
-      setTotalScore(newTotal);
-      return updated;
-    });
   };
 
   const handleMarkIncorrect = (questionId: string) => {
@@ -382,7 +382,7 @@ export const GradingInterface = ({ submissionId, onBack }: GradingInterfaceProps
                         size="sm"
                         variant={questionMarking[question.id] === true ? "default" : "outline"}
                         className="h-8"
-                        onClick={() => handleMarkCorrect(question.id, question.points)}
+                        onClick={() => handleMarkCorrect(question.id)}
                       >
                         <CheckCircle className="h-3 w-3 mr-1" />
                         Correct

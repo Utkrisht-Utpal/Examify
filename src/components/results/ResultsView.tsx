@@ -126,9 +126,13 @@ export const ResultsView = ({ user, onBack }: ResultsViewProps) => {
               const userAnswer = answers[question.id] || '';
               const grade = gradesMap.get(question.id);
               
-              // Use is_correct flag if set, otherwise fallback to score logic
-              const isCorrect = grade?.is_correct === true || (grade?.is_correct === null && grade.score === grade.max_score);
-              const isIncorrect = grade?.is_correct === false || (grade?.is_correct === null && grade.score === 0);
+              // Logic: ANY non-zero score = Correct (unless explicitly marked incorrect)
+              // Zero score = Incorrect
+              const isCorrect = grade?.is_correct === true ? true : 
+                                grade?.is_correct === false ? false :
+                                grade && grade.score > 0;  // Any non-zero = correct
+              
+              const isIncorrect = grade?.is_correct === false || (grade?.is_correct === null && grade && grade.score === 0);
               
               if (isCorrect) correctAnswers++;
               else if (isIncorrect) incorrectAnswers++;
