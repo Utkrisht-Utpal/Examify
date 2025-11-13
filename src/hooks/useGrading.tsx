@@ -266,6 +266,35 @@ export const useGrading = (examId?: string) => {
     }
   });
 
+  // Auto-grade MCQ mutation
+  const autoGradeMcq = useMutation({
+    mutationFn: async (attemptId: string) => {
+      const { data, error } = await supabase.rpc('auto_grade_mcq', {
+        attempt_id_param: attemptId
+      });
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['pending-submissions'] });
+      queryClient.invalidateQueries({ queryKey: ['all-submissions'] });
+      queryClient.invalidateQueries({ queryKey: ['results'] });
+      toast({
+        title: 'MCQ Auto-graded',
+        description: data?.message || 'MCQ questions graded successfully'
+      });
+    },
+    onError: (error) => {
+      const errorMessage = error instanceof Error ? error.message : 'Auto-grading failed';
+      toast({
+        title: 'Error',
+        description: errorMessage,
+        variant: 'destructive'
+      });
+    }
+  });
+
   return {
     pendingSubmissions,
     isLoadingSubmissions,
@@ -273,6 +302,7 @@ export const useGrading = (examId?: string) => {
     allSubmissions,
     isLoadingAllSubmissions,
     fetchSubmissionDetails,
-    gradeSubmission
+    gradeSubmission,
+    autoGradeMcq
   };
 };
