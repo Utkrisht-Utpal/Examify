@@ -100,7 +100,7 @@ export const GradingInterface = ({ submissionId, onBack }: GradingInterfaceProps
     loadSubmission();
   }, [submissionId, fetchSubmissionDetails]);
 
-  const handleGradeChange = (questionId: string, raw: string, maxPoints: number) => {
+  const handleGradeChange = (questionId: string, raw: string, maxPoints: number | null | undefined) => {
     // Allow empty input while typing; treat as 0 for totals
     if (raw === '') {
       const merged = { ...questionGrades, [questionId]: '' as const };
@@ -112,9 +112,11 @@ export const GradingInterface = ({ submissionId, onBack }: GradingInterfaceProps
 
     const parsed = Number(raw);
     const safe = Number.isFinite(parsed) ? parsed : 0;
-    const validPoints = Math.max(0, Math.min(safe, maxPoints));
+    const maxNum = Number(maxPoints);
+    const hasValidMax = Number.isFinite(maxNum) && maxNum >= 0;
+    const clamped = hasValidMax ? Math.min(Math.max(0, safe), maxNum) : Math.max(0, safe);
 
-    const merged = { ...questionGrades, [questionId]: validPoints };
+    const merged = { ...questionGrades, [questionId]: clamped };
     const newTotal = Object.values(merged).reduce((sum, pts) => sum + (typeof pts === 'number' ? pts : 0), 0);
     setQuestionGrades(merged);
     setTotalScore(newTotal);
@@ -299,7 +301,7 @@ export const GradingInterface = ({ submissionId, onBack }: GradingInterfaceProps
                         id={`points-${question.id}`}
                         type="number"
                         min={0}
-                        max={question.points}
+                        max={Number.isFinite(Number(question.points)) && Number(question.points) >= 0 ? Number(question.points) : undefined}
                         value={questionGrades[question.id] === '' || questionGrades[question.id] === undefined ? '' : (questionGrades[question.id] as number)}
                         onChange={(e) => handleGradeChange(
                           question.id,
