@@ -36,19 +36,49 @@ export const TeacherDashboard = ({ user, onCreateExam, onViewResults, onViewExam
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id || null));
   }, []);
 
-  // Fetch student count strictly from user_roles (no fallbacks) with real-time updates
+  // Fetch student count from user_roles with safe fallbacks; keep real-time updates
   React.useEffect(() => {
-    const fetchStudentCount = async () => {
+    let cancelled = false;
+
+    const fetchFromUserRoles = async () => {
       const { count, error } = await supabase
         .from('user_roles')
         .select('*', { count: 'exact', head: true })
         .eq('role', 'student');
+      if (cancelled) return { count: null, error };
+      return { count, error };
+    };
 
-      if (!error && count !== null) {
-        setStudentCount(count);
-      } else {
-        setStudentCount(0);
+    const fetchFallback = async (): Promise<number> => {
+      // Try distinct students from exam_attempts first
+      const { data: attempts, error: attemptsErr } = await supabase
+        .from('exam_attempts')
+        .select('student_id');
+      if (!attemptsErr && attempts) {
+        const uniq = new Set((attempts || []).map((r: any) => r.student_id).filter(Boolean));
+        if (uniq.size > 0) return uniq.size;
       }
+
+      // Fallback to submissions if attempts not available
+      const { data: subs, error: subsErr } = await supabase
+        .from('submissions')
+        .select('student_id');
+      if (!subsErr && subs) {
+        const uniq = new Set((subs || []).map((r: any) => r.student_id).filter(Boolean));
+        return uniq.size;
+      }
+
+      return 0;
+    };
+
+    const fetchStudentCount = async () => {
+      const primary = await fetchFromUserRoles();
+      if (!primary.error && typeof primary.count === 'number' && primary.count >= 0) {
+        setStudentCount(primary.count);
+        return;
+      }
+      const fallbackCount = await fetchFallback();
+      setStudentCount(fallbackCount);
     };
 
     // Initial fetch
@@ -72,6 +102,7 @@ export const TeacherDashboard = ({ user, onCreateExam, onViewResults, onViewExam
       .subscribe();
 
     return () => {
+      cancelled = true;
       supabase.removeChannel(channel);
     };
   }, []);
