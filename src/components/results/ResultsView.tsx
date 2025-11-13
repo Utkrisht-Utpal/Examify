@@ -44,6 +44,8 @@ interface StudentResult {
     yourAnswer: string;
     correctAnswer: string;
     isCorrect: boolean;
+    score: number;
+    maxScore: number;
   }[];
 }
 
@@ -51,6 +53,7 @@ export const ResultsView = ({ user, onBack }: ResultsViewProps) => {
   const [userId, setUserId] = useState<string | null>(null);
   const [detailedResults, setDetailedResults] = useState<StudentResult[]>([]);
   const [isLoadingDetails, setIsLoadingDetails] = useState(true);
+  const [selectedExamId, setSelectedExamId] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchUserId = async () => {
@@ -105,6 +108,14 @@ export const ResultsView = ({ user, onBack }: ResultsViewProps) => {
               .eq('exam_id', result.exam_id)
               .order('order_number');
 
+            // Fetch actual grades given by teacher
+            const { data: grades } = await supabase
+              .from('grades')
+              .select('question_id, score, max_score')
+              .eq('attempt_id', result.submission_id);
+
+            const gradesMap = new Map(grades?.map(g => [g.question_id, g]) || []);
+
             const answers = (attempt?.answers || submission?.answers || {}) as Record<string, string>;
             const timeInMinutes = (attempt?.time_taken || submission?.time_taken || 0) as number;
             let correctAnswers = 0;
@@ -113,17 +124,23 @@ export const ResultsView = ({ user, onBack }: ResultsViewProps) => {
             const questionAnalysis = examQuestions?.map((eq) => {
               const question = eq.questions;
               const userAnswer = answers[question.id] || '';
-              const isCorrect = userAnswer.toLowerCase().trim() === question.correct_answer.toLowerCase().trim();
+              const grade = gradesMap.get(question.id);
+              
+              // Use grade to determine correct/incorrect
+              const isCorrect = grade ? grade.score === grade.max_score : false;
+              const isIncorrect = grade ? grade.score === 0 : false;
               
               if (isCorrect) correctAnswers++;
-              else if (userAnswer) incorrectAnswers++;
+              else if (isIncorrect) incorrectAnswers++;
 
               return {
                 questionId: question.id,
                 question: question.question_text,
                 yourAnswer: userAnswer || 'Not answered',
                 correctAnswer: question.correct_answer,
-                isCorrect
+                isCorrect,
+                score: grade?.score || 0,
+                maxScore: grade?.max_score || question.points
               };
             }) || [];
 
@@ -201,18 +218,75 @@ export const ResultsView = ({ user, onBack }: ResultsViewProps) => {
       );
     }
 
-    const result = detailedResults[0]; // Show most recent result
+    // If no exam selected, show list of exams
+    if (!selectedExamId) {
+      return (
+        <div className="p-6 space-y-6">
+          <div className="flex items-center gap-4">
+            <Button variant="outline" onClick={onBack}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Dashboard
+            </Button>
+            <div>
+              <h1 className="text-3xl font-bold">Exam Results</h1>
+              <p className="text-muted-foreground">Select an exam to view detailed results</p>
+            </div>
+          </div>
+
+          <div className="grid gap-4">
+            {detailedResults.map((result) => (
+              <Card key={result.examId} className="cursor-pointer hover:border-primary transition-colors" onClick={() => setSelectedExamId(result.examId)}>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-1">
+                      <h3 className="font-semibold text-lg">{result.examTitle}</h3>
+                      <p className="text-sm text-muted-foreground">{result.subject}</p>
+                      <p className="text-xs text-muted-foreground">Submitted: {result.submittedAt}</p>
+                    </div>
+                    <div className="text-right space-y-2">
+                      <div className={`text-3xl font-bold ${getScoreColor(result.percentage)}`}>
+                        {result.score}/{result.maxScore}
+                      </div>
+                      <Badge className={getScoreColor(result.percentage)}>
+                        {result.percentage}%
+                      </Badge>
+                    </div>
+                  </div>
+                  <div className="mt-4 flex gap-4 text-sm">
+                    <div className="flex items-center gap-1 text-success">
+                      <CheckCircle className="h-4 w-4" />
+                      <span>{result.correctAnswers} Correct</span>
+                    </div>
+                    <div className="flex items-center gap-1 text-destructive">
+                      <XCircle className="h-4 w-4" />
+                      <span>{result.incorrectAnswers} Incorrect</span>
+                    </div>
+                    <div className="flex items-center gap-1 text-muted-foreground">
+                      <Clock className="h-4 w-4" />
+                      <span>{result.timeSpent}</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    const result = detailedResults.find(r => r.examId === selectedExamId);
+    if (!result) return null;
 
     return (
       <div className="p-6 space-y-6">
         <div className="flex items-center gap-4">
-          <Button variant="outline" onClick={onBack}>
+          <Button variant="outline" onClick={() => setSelectedExamId(null)}>
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Dashboard
+            Back to Results List
           </Button>
           <div>
-            <h1 className="text-3xl font-bold">Exam Results</h1>
-            <p className="text-muted-foreground">Detailed performance analysis</p>
+            <h1 className="text-3xl font-bold">{result.examTitle}</h1>
+            <p className="text-muted-foreground">{result.subject} • Detailed performance analysis</p>
           </div>
         </div>
 
@@ -317,12 +391,19 @@ export const ResultsView = ({ user, onBack }: ResultsViewProps) => {
                     
                     <div>
                       <p className="font-medium text-sm mb-1">Your Answer:</p>
-                      <p className={`text-sm ${question.isCorrect ? 'text-success' : 'text-destructive'}`}>
+                      <p className={`text-sm ${question.isCorrect ? 'text-success' : 'text-muted-foreground'}`}>
                         {question.yourAnswer}
                       </p>
                     </div>
+
+                    <div>
+                      <p className="font-medium text-sm mb-1">Score:</p>
+                      <p className="text-sm font-semibold">
+                        {question.score}/{question.maxScore} marks
+                      </p>
+                    </div>
                     
-                    {!question.isCorrect && (
+                    {question.correctAnswer && question.correctAnswer.trim() !== '' && (
                       <div>
                         <p className="font-medium text-sm mb-1">Correct Answer:</p>
                         <p className="text-sm text-success">{question.correctAnswer}</p>
