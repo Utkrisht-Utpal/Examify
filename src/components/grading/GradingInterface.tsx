@@ -98,7 +98,7 @@ export const GradingInterface = ({ submissionId, onBack }: GradingInterfaceProps
     };
 
     loadSubmission();
-  }, [submissionId, fetchSubmissionDetails]);
+  }, [submissionId]);
 
   const handleGradeChange = (questionId: string, raw: string, maxPoints: number | null | undefined) => {
     // Allow empty input while typing; treat as 0 for totals
