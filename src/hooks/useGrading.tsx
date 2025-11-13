@@ -170,7 +170,7 @@ export const useGrading = (examId?: string) => {
       score: number;
       totalMarks: number;
       feedback?: string;
-      questionGrades?: Record<string, { score: number; maxScore: number }>;
+      questionGrades?: Record<string, { score: number; maxScore: number; isCorrect?: boolean | null }>;
     }) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');

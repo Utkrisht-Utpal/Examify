@@ -152,6 +152,19 @@ export const ResultsView = ({ user, onBack }: ResultsViewProps) => {
             const minutes = timeInMinutes % 60;
             const timeSpent = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
 
+            // Ensure feedback is fetched even if merge missed it
+            let feedbackText = (result as any).feedback || null;
+            if (!feedbackText) {
+              const { data: feedbackRow } = await supabase
+                .from('results')
+                .select('feedback')
+                .eq('student_id', result.student_id)
+                .eq('exam_id', result.exam_id)
+                .order('created_at', { ascending: false })
+                .maybeSingle();
+              feedbackText = feedbackRow?.feedback || null;
+            }
+
             return {
               examId: result.exam_id,
               examTitle: result.exams?.title || 'Unknown Exam',
@@ -166,7 +179,7 @@ export const ResultsView = ({ user, onBack }: ResultsViewProps) => {
               timeSpent,
               submittedAt: new Date(result.created_at).toLocaleString(),
               questionAnalysis,
-              feedback: (result as any).feedback || null
+              feedback: feedbackText
             };
           })
         );
