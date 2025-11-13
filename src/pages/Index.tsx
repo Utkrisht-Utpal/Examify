@@ -65,7 +65,7 @@ const Index = () => {
     setCurrentExamId(null);
     toast({
       title: "Exam Submitted",
-      description: `Your exam has been submitted! Score: ${results.totalScore}/${results.maxScore} (${results.percentage}%)`,
+      description: `Your exam has been submitted! Scores will get updated out of: ${results.maxScore} after grading`,
     });
   };
 
