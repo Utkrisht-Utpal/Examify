@@ -2,7 +2,7 @@
 
 Live App: https://examif1.vercel.app/
 
-Author: [YOUR NAME]
+Author: Utkrisht Utpal
 
 Examify is a modern, cloud-backed web app for creating, taking, and grading exams. It provides role-based experiences for students and teachers, real-time updates, and a polished UI built with React, TypeScript, and Tailwind.
 
@@ -202,5 +202,3 @@ sequenceDiagram
 ```
 
 ---
-
-Questions or a name update for the Author line? Tell me the exact name to credit and I’ll update this file accordingly.
