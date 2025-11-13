@@ -51,6 +51,14 @@ export const TeacherDashboard = ({ user, onCreateExam, onViewResults, onViewExam
       return { count, error };
     };
 
+    const fetchFromRPC = async (): Promise<number | null> => {
+      // Prefer a SECURITY DEFINER RPC that bypasses RLS reliably
+      const { data, error } = await supabase.rpc('get_total_students');
+      if (cancelled) return null;
+      if (!error && typeof data === 'number') return data;
+      return null;
+    };
+
     const fetchFallback = async (): Promise<number> => {
       // Try distinct students from exam_attempts first
       const { data: attempts, error: attemptsErr } = await supabase
@@ -74,19 +82,22 @@ export const TeacherDashboard = ({ user, onCreateExam, onViewResults, onViewExam
     };
 
     const fetchStudentCount = async () => {
-      const primary = await fetchFromUserRoles();
-      if (!primary.error && typeof primary.count === 'number' && primary.count >= 0) {
-        setStudentCount(primary.count);
-        return;
-      }
-      const fallbackCount = await fetchFallback();
-      setStudentCount(fallbackCount);
+      // Compute RPC, table count and fallback, then pick the max as the final value
+      const [rpcCount, primary, fallbackCount] = await Promise.all([
+        fetchFromRPC(),
+        fetchFromUserRoles(),
+        fetchFallback(),
+      ]);
+      const primaryCount = !primary.error && typeof primary.count === 'number' ? primary.count : 0;
+      const rpcSafe = typeof rpcCount === 'number' ? rpcCount : 0;
+      const finalCount = Math.max(rpcSafe, primaryCount, fallbackCount);
+      setStudentCount(finalCount);
     };
 
     // Initial fetch
     fetchStudentCount();
 
-    // Subscribe to real-time changes on user_roles only
+    // Subscribe to real-time changes on user_roles and activity fallbacks
     const channel = supabase
       .channel('student_count_changes')
       .on(
@@ -97,9 +108,17 @@ export const TeacherDashboard = ({ user, onCreateExam, onViewResults, onViewExam
           table: 'user_roles',
           filter: 'role=eq.student'
         },
-        () => {
-          fetchStudentCount();
-        }
+        () => fetchStudentCount()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'exam_attempts' },
+        () => fetchStudentCount()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'submissions' },
+        () => fetchStudentCount()
       )
       .subscribe();
 
