@@ -284,29 +284,31 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     (async () => {
       try {
         console.log('Checking for existing session on mount...');
-        console.log('initialChecked status:', false);
-        
-        // Debug: Check what's in localStorage
-        const lsKeys = Object.keys(localStorage);
-        console.log('localStorage keys:', lsKeys);
-        const authKeys = lsKeys.filter(k => k.includes('sb') || k.includes('supabase') || k.includes('auth'));
-        console.log('Auth-related keys:', authKeys);
         
         const { data: { session }, error } = await supabase.auth.getSession();
         console.log('Session check result:', !!session, 'Error:', error);
-        if (session) {
-          console.log('Session user:', session.user?.email, 'Role:', session.user?.user_metadata?.role);
-        }
         
-        await loadUserSession(session);
-        console.log('Session initialization complete');
-      } catch (error) {
-        console.error('Error checking session:', error);
-      } finally {
+        // Set session and user immediately
         if (mounted) {
+          setSession(session);
+          setUser(session?.user ?? null);
+          
+          // Set initialChecked immediately after getting session
           console.log('Setting initialChecked to true');
           setInitialChecked(true);
           console.log('Setting loading to false');
+          setLoading(false);
+        }
+        
+        // Load roles in background (non-blocking)
+        if (session?.user && mounted) {
+          console.log('Loading user roles in background...');
+          loadUserSession(session);
+        }
+      } catch (error) {
+        console.error('Error checking session:', error);
+        if (mounted) {
+          setInitialChecked(true);
           setLoading(false);
         }
       }
@@ -326,7 +328,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             const justLoggedIn = localStorage.getItem('justLoggedIn') === 'true';
             console.log('SIGNED_IN event - justLoggedIn:', justLoggedIn);
             
-            // Only show loading state for user-initiated logins, not session restoration
+            // Only reload session for user-initiated logins
             if (justLoggedIn) {
               try {
                 setLoading(true);
@@ -337,9 +339,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               localStorage.removeItem('justLoggedIn');
               console.log('✓ User-initiated login complete');
             } else {
-              // Session restoration - don't show loading, just update state silently
-              console.log('✓ Session restored (no redirect, no loading)');
-              await loadUserSession(session);
+              // Session restoration during mount - already handled by mount effect
+              console.log('✓ Session restored (handled by mount effect)');
             }
             break;
           }
