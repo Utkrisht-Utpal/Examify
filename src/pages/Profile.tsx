@@ -346,6 +346,33 @@ const Profile = () => {
     };
   }, [authReady, finalRole, navigate, session, user]);
 
+  const totalExamsGiven = studentExams.length;
+  const upcomingCount = upcomingExams.length;
+  const teacherTotalExams = teacherExams.length;
+  const pendingCount = pendingEvaluations.length;
+
+  const totalStudentsAppeared = useMemo(
+    () => teacherExams.reduce((acc, exam) => acc + exam.studentsAppeared, 0),
+    [teacherExams],
+  );
+
+  const teacherOverallAvgPercentage = useMemo(() => {
+    const valid = teacherExams.filter((exam) => exam.avgPercentage != null);
+    if (!valid.length) return null;
+    const sum = valid.reduce((acc, exam) => acc + (exam.avgPercentage ?? 0), 0);
+    return Math.round(sum / valid.length);
+  }, [teacherExams]);
+
+  const showStudentSections = finalRole === "student";
+  const showTeacherSections = finalRole === "teacher" || finalRole === "admin";
+
+  // Ensure the default tab always exists in the current TabList configuration
+  const defaultTab: "attempts" | "created" | "pending" = showStudentSections
+    ? "attempts"
+    : showTeacherSections
+      ? "created"
+      : "attempts";
+
   if (!authReady || isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -396,21 +423,11 @@ const Profile = () => {
   const teacherTotalExams = teacherExams.length;
   const pendingCount = pendingEvaluations.length;
 
-  const totalStudentsAppeared = useMemo(
-    () => teacherExams.reduce((acc, exam) => acc + exam.studentsAppeared, 0),
-    [teacherExams],
-  );
-
-  const teacherOverallAvgPercentage = useMemo(() => {
-    const valid = teacherExams.filter((exam) => exam.avgPercentage != null);
-    if (!valid.length) return null;
-    const sum = valid.reduce((acc, exam) => acc + (exam.avgPercentage ?? 0), 0);
-    return Math.round(sum / valid.length);
-  }, [teacherExams]);
-
-  const defaultTab = finalRole === "teacher" ? "created" : "attempts";
-  const showStudentSections = finalRole === "student";
-  const showTeacherSections = finalRole === "teacher" || finalRole === "admin";
+  return (
+    ? "attempts"
+    : showTeacherSections
+      ? "created"
+      : "attempts";
 
   return (
     <div className="min-h-screen bg-background">
