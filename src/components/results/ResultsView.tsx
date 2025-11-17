@@ -153,7 +153,8 @@ export const ResultsView = ({ user, onBack }: ResultsViewProps) => {
             const timeSpent = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
 
             // Ensure feedback is fetched even if merge missed it
-            let feedbackText = (result as any).feedback || null;
+            const resultWithFeedback = result as { feedback?: string | null };
+            let feedbackText = resultWithFeedback.feedback ?? null;
             if (!feedbackText) {
               const { data: feedbackRow } = await supabase
                 .from('results')
