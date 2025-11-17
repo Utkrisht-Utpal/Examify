@@ -396,6 +396,22 @@ const Profile = () => {
   const teacherTotalExams = teacherExams.length;
   const pendingCount = pendingEvaluations.length;
 
+  const totalStudentsAppeared = useMemo(
+    () => teacherExams.reduce((acc, exam) => acc + exam.studentsAppeared, 0),
+    [teacherExams],
+  );
+
+  const teacherOverallAvgPercentage = useMemo(() => {
+    const valid = teacherExams.filter((exam) => exam.avgPercentage != null);
+    if (!valid.length) return null;
+    const sum = valid.reduce((acc, exam) => acc + (exam.avgPercentage ?? 0), 0);
+    return Math.round(sum / valid.length);
+  }, [teacherExams]);
+
+  const defaultTab = finalRole === "teacher" ? "created" : "attempts";
+  const showStudentSections = finalRole === "student";
+  const showTeacherSections = finalRole === "teacher" || finalRole === "admin";
+
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-6xl mx-auto px-4 py-8 space-y-6">
@@ -438,65 +454,110 @@ const Profile = () => {
           </div>
         </div>
 
-        {/* Stats row */}
-        <div className="grid gap-4 md:grid-cols-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Exams</CardTitle>
-              <BookOpen className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {finalRole === "teacher" ? teacherTotalExams : totalExamsGiven}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {finalRole === "teacher" ? "Exams you have created" : "Exams you have completed"}
-              </p>
-            </CardContent>
-          </Card>
+        {/* Stats row - student vs teacher specific */}
+        {showStudentSections && (
+          <div className="grid gap-4 md:grid-cols-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Exams</CardTitle>
+                <BookOpen className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{totalExamsGiven}</div>
+                <p className="text-xs text-muted-foreground">Exams you have completed</p>
+              </CardContent>
+            </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Average Score</CardTitle>
-              <BarChart3 className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-primary">
-                {avgScore}
-                <span className="text-sm text-muted-foreground ml-1">marks</span>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {avgPercentage}% average across graded exams
-              </p>
-            </CardContent>
-          </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Average Score</CardTitle>
+                <BarChart3 className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-primary">
+                  {avgScore}
+                  <span className="text-sm text-muted-foreground ml-1">marks</span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {avgPercentage}% average across graded exams
+                </p>
+              </CardContent>
+            </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Attempts</CardTitle>
-              <Award className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{totalExamsGiven}</div>
-              <p className="text-xs text-muted-foreground">Graded exam attempts</p>
-            </CardContent>
-          </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Attempts</CardTitle>
+                <Award className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{totalExamsGiven}</div>
+                <p className="text-xs text-muted-foreground">Graded exam attempts</p>
+              </CardContent>
+            </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Upcoming</CardTitle>
-              <Clock className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-warning">
-                {finalRole === "teacher" ? pendingCount : upcomingCount}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {finalRole === "teacher" ? "Submissions pending evaluation" : "Upcoming exams"}
-              </p>
-            </CardContent>
-          </Card>
-        </div>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Upcoming</CardTitle>
+                <Clock className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-warning">{upcomingCount}</div>
+                <p className="text-xs text-muted-foreground">Upcoming exams</p>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {showTeacherSections && (
+          <div className="grid gap-4 md:grid-cols-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Exams Created</CardTitle>
+                <BookOpen className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{teacherTotalExams}</div>
+                <p className="text-xs text-muted-foreground">Exams you have authored</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Students Appeared</CardTitle>
+                <Users className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{totalStudentsAppeared}</div>
+                <p className="text-xs text-muted-foreground">Unique students across your exams</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Average Score</CardTitle>
+                <BarChart3 className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-primary">
+                  {teacherOverallAvgPercentage ?? 0}
+                  <span className="text-sm text-muted-foreground ml-1">%</span>
+                </div>
+                <p className="text-xs text-muted-foreground">Average percentage across your exams</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Pending Evaluations</CardTitle>
+                <Clock className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-warning">{pendingCount}</div>
+                <p className="text-xs text-muted-foreground">Submissions waiting for review</p>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         {/* Main two-column layout */}
         <div className="grid gap-6 md:grid-cols-[minmax(0,1.1fr)_minmax(0,1.9fr)]">
@@ -556,14 +617,21 @@ const Profile = () => {
 
           {/* Right: tabbed lists */}
           <div className="space-y-4">
-            <Tabs defaultValue="attempts" className="space-y-4">
+            <Tabs defaultValue={defaultTab} className="space-y-4">
               <TabsList>
-                <TabsTrigger value="attempts">Attempts</TabsTrigger>
-                <TabsTrigger value="created">Created Exams</TabsTrigger>
-                <TabsTrigger value="pending">Pending</TabsTrigger>
+                {showStudentSections && (
+                  <TabsTrigger value="attempts">Attempts</TabsTrigger>
+                )}
+                {showTeacherSections && (
+                  <TabsTrigger value="created">Created Exams</TabsTrigger>
+                )}
+                {showTeacherSections && (
+                  <TabsTrigger value="pending">Pending</TabsTrigger>
+                )}
               </TabsList>
 
-              <TabsContent value="attempts" className="space-y-4">
+              {showStudentSections && (
+                <TabsContent value="attempts" className="space-y-4">
                 <Card>
                   <CardHeader>
                     <CardTitle>Your exam attempts</CardTitle>
@@ -639,7 +707,9 @@ const Profile = () => {
                   </CardContent>
                 </Card>
               </TabsContent>
+              )}
 
+              {showTeacherSections && (
               <TabsContent value="created" className="space-y-4">
                 <Card>
                   <CardHeader>
@@ -686,7 +756,9 @@ const Profile = () => {
                   </CardContent>
                 </Card>
               </TabsContent>
+              )}
 
+              {showTeacherSections && (
               <TabsContent value="pending" className="space-y-4">
                 <Card>
                   <CardHeader>
@@ -732,6 +804,7 @@ const Profile = () => {
                   </CardContent>
                 </Card>
               </TabsContent>
+              )}
             </Tabs>
           </div>
         </div>
