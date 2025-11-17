@@ -12,10 +12,9 @@ interface HeaderProps {
     role: string;
   };
   onLogout: () => void;
-  onProfileClick?: () => void;
 }
 
-export const Header = ({ user, onLogout, onProfileClick }: HeaderProps) => {
+export const Header = ({ user, onLogout }: HeaderProps) => {
   const { theme, setTheme } = useTheme();
 
   const getRoleBadge = (role: string) => {
@@ -31,13 +30,6 @@ export const Header = ({ user, onLogout, onProfileClick }: HeaderProps) => {
     e.preventDefault();
     e.stopPropagation();
     onLogout();
-  };
-
-  const handleProfileClick: React.MouseEventHandler<HTMLDivElement> = (e) => {
-    if (!onProfileClick) return;
-    e.preventDefault();
-    e.stopPropagation();
-    onProfileClick();
   };
 
   const handleThemeToggle: React.MouseEventHandler<HTMLButtonElement> = (e) => {
@@ -84,10 +76,7 @@ export const Header = ({ user, onLogout, onProfileClick }: HeaderProps) => {
             {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </Button>
 
-          <div
-            className="flex items-center gap-3 cursor-pointer"
-            onClick={handleProfileClick}
-          >
+          <div className="flex items-center gap-3">
             <div className="text-right">
               <p className="text-sm font-medium">{user.name}</p>
               <div className="flex items-center gap-1">

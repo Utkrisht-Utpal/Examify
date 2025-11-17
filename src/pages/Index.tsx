@@ -166,7 +166,7 @@ const Index = () => {
   if (currentView === "results") {
     return (
       <div className="min-h-screen bg-background">
-        <Header user={user} onLogout={handleLogout} onProfileClick={() => navigate('/profile')} />
+        <Header user={user} onLogout={handleLogout} />
         <ResultsView user={user} onBack={handleBackToDashboard} />
       </div>
     );
@@ -184,7 +184,7 @@ const Index = () => {
   if (currentView === "view-exam" && currentExamId) {
     return (
       <div className="min-h-screen bg-background">
-        <Header user={user} onLogout={handleLogout} onProfileClick={() => navigate('/profile')} />
+        <Header user={user} onLogout={handleLogout} />
         <ExamView 
           examId={currentExamId}
           onBack={handleBackToDashboard}
@@ -198,7 +198,7 @@ const Index = () => {
   if (currentView === "grading" && currentSubmissionId) {
     return (
       <div className="min-h-screen bg-background">
-        <Header user={user} onLogout={handleLogout} onProfileClick={() => navigate('/profile')} />
+        <Header user={user} onLogout={handleLogout} />
         <GradingInterface 
           submissionId={currentSubmissionId}
           onBack={handleBackToDashboard}
@@ -209,7 +209,7 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header user={user} onLogout={handleLogout} onProfileClick={() => navigate('/profile')} />
+      <Header user={user} onLogout={handleLogout} />
       
       <main>
         {finalRole === "student" && (

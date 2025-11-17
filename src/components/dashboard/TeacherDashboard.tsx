@@ -65,12 +65,7 @@ export const TeacherDashboard = ({ user, onCreateExam, onViewResults, onViewExam
         .from('exam_attempts')
         .select('student_id');
       if (!attemptsErr && attempts) {
-        const attemptRows = (attempts ?? []) as { student_id: string | null }[];
-        const uniq = new Set(
-          attemptRows
-            .map((r) => r.student_id)
-            .filter((id): id is string => Boolean(id))
-        );
+        const uniq = new Set((attempts || []).map((r: any) => r.student_id).filter(Boolean));
         if (uniq.size > 0) return uniq.size;
       }
 
@@ -79,12 +74,7 @@ export const TeacherDashboard = ({ user, onCreateExam, onViewResults, onViewExam
         .from('submissions')
         .select('student_id');
       if (!subsErr && subs) {
-        const submissionRows = (subs ?? []) as { student_id: string | null }[];
-        const uniq = new Set(
-          submissionRows
-            .map((r) => r.student_id)
-            .filter((id): id is string => Boolean(id))
-        );
+        const uniq = new Set((subs || []).map((r: any) => r.student_id).filter(Boolean));
         return uniq.size;
       }
 

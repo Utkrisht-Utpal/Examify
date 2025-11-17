@@ -98,9 +98,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         const roleList = (rolesData || []).map(r => r.role);
         console.log(`✓ Role fetch successful:`, roleList);
         return roleList;
-      } catch (e) {
-        const message = e instanceof Error ? e.message : e;
-        console.warn(`Role fetch attempt ${attempt} failed:`, message);
+      } catch (e: any) {
+        console.warn(`Role fetch attempt ${attempt} failed:`, e.message || e);
         
         if (attempt < maxAttempts) {
           // Exponential backoff: 500ms, 1000ms, 2000ms
