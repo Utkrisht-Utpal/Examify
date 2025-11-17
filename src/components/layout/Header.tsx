@@ -2,7 +2,8 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { BookOpen, LogOut, Bell } from "lucide-react";
+import { useTheme } from "@/components/theme-provider";
+import { BookOpen, LogOut, Bell, Moon, Sun } from "lucide-react";
 
 interface HeaderProps {
   user: {
@@ -14,6 +15,8 @@ interface HeaderProps {
 }
 
 export const Header = ({ user, onLogout }: HeaderProps) => {
+  const { theme, setTheme } = useTheme();
+
   const getRoleBadge = (role: string) => {
     const variants = {
       student: "bg-success text-success-foreground",
@@ -27,6 +30,12 @@ export const Header = ({ user, onLogout }: HeaderProps) => {
     e.preventDefault();
     e.stopPropagation();
     onLogout();
+  };
+
+  const handleThemeToggle: React.MouseEventHandler<HTMLButtonElement> = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setTheme(theme === "dark" ? "light" : "dark");
   };
 
   return (
@@ -56,7 +65,17 @@ export const Header = ({ user, onLogout }: HeaderProps) => {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          
+
+          <Button
+            variant="outline"
+            size="sm"
+            type="button"
+            onClick={handleThemeToggle}
+            aria-label="Toggle theme"
+          >
+            {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          </Button>
+
           <div className="flex items-center gap-3">
             <div className="text-right">
               <p className="text-sm font-medium">{user.name}</p>
