@@ -15,6 +15,7 @@ Examify is a modern, cloud-backed web app for creating, taking, and grading exam
 - Real-time results updates (Supabase Realtime + React Query cache invalidation)
 - Clean UI built on shadcn-ui and Radix primitives
 - Reliable server-state management with React Query
+- Usable Dark and Light mode added for user preference
 
 
 ## Tech stack
